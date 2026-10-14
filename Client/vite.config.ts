@@ -3,11 +3,14 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
+import { compression } from 'vite-plugin-compression2'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     tailwindcss(),
     react(),
+    compression({ algorithms: ['gzip', 'brotliCompress'] }),
   ],
   resolve: {
     alias: {
@@ -15,6 +18,8 @@ export default defineConfig({
     },
   },
   build: {
+    cssCodeSplit: true,
+    modulePreload: { polyfill: false },
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {

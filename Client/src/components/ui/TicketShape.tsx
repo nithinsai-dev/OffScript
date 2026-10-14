@@ -98,29 +98,30 @@ function getSharedRO() {
  * Deterministic Barcode generator from an ID string
  */
 export function TicketBarcode({ id = 'OFFSCRIPT', className = '' }: { id?: string; className?: string }) {
-  const bars = []
   let seed = 0
   for (let i = 0; i < id.length; i++) {
     seed = (seed * 31 + id.charCodeAt(i)) % 1000
   }
 
-  for (let i = 0; i < 24; i++) {
+  let d = ''
+  let currentX = 2
+  for (let i = 0; i < 20; i++) {
     const pseudoRandom = Math.sin(seed + i * 7.5) * 10000
     const val = Math.floor(Math.abs(pseudoRandom)) % 3
-    const width = val === 0 ? 1.5 : val === 1 ? 2.5 : 4
-    bars.push({ width, isGap: i % 4 === 3 })
+    const width = val === 0 ? 1.5 : val === 1 ? 2.5 : 3.5
+    d += `M${currentX.toFixed(1)} 0 V24 `
+    currentX += width + 2
   }
 
   return (
-    <div className={`flex items-center gap-[2px] h-6 overflow-hidden select-none ${className}`}>
-      {bars.map((bar, idx) => (
-        <span
-          key={idx}
-          className="h-full bg-bone opacity-75 shrink-0"
-          style={{ width: `${bar.width}px` }}
-        />
-      ))}
-    </div>
+    <svg
+      aria-hidden="true"
+      viewBox={`0 0 ${Math.ceil(currentX + 2)} 24`}
+      className={`h-5 w-auto overflow-hidden select-none stroke-bone opacity-75 ${className}`}
+      strokeWidth="2"
+    >
+      <path d={d} />
+    </svg>
   )
 }
 

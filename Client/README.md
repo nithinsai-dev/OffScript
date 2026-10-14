@@ -151,9 +151,10 @@ OFFSCRIPT outputs a high-performance, cache-friendly production bundle with hash
    - Header: `Cache-Control: public, max-age=0, must-revalidate`
    - Rationale: Ensures users immediately receive the latest application bundle on new deployments.
 
-3. **Compression**:
-   - Enable **Brotli** (`br`) with fallback to **Gzip** (`gzip`).
-   - The initial gzipped bundle entry is under **33 KB**, and lazy chunks are under **9 KB**.
+3. **Compression & HTTP/2 Protocol**:
+   - Serve over **HTTP/2** or **HTTP/3** for efficient stream multiplexing.
+   - Serve precompressed **Brotli** (`.br`) and **Gzip** (`.gz`) static files directly from disk (`vite-plugin-compression2` pre-generates `.br` and `.gz` archives for all assets during `npm run build`).
+   - The initial gzipped bundle entry is under **30 KB**, and initial brotli entry is under **25 KB**. Lazy chunks are under **9 KB**.
 
 ---
 

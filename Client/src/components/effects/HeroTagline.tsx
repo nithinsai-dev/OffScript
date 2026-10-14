@@ -10,7 +10,7 @@ const ROTATING_PHRASES = [
 export function HeroTagline() {
   const prefersReduced = usePrefersReducedMotion()
   const [phraseIndex, setPhraseIndex] = useState(0)
-  const [displayText, setDisplayText] = useState('')
+  const [displayText, setDisplayText] = useState(ROTATING_PHRASES[0])
   const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {

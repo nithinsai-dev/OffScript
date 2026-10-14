@@ -3,7 +3,7 @@ import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 
 export function SponsorsSection() {
   const prefersReduced = usePrefersReducedMotion()
-  const repeatedSponsors = [...SPONSORS, ...SPONSORS]
+  const repeatedSponsors = SPONSORS
 
   return (
     <section

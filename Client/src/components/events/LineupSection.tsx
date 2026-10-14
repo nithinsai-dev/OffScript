@@ -148,21 +148,23 @@ export function LineupSection({ events }: LineupSectionProps) {
     })
   }
 
+  const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
+
   return (
     <section
       ref={wrapperRef}
       id="lineup"
       style={{
-        height: isDesktop && !prefersReduced ? wrapperHeight : 'auto',
+        height: isDesktop && !prefersReduced && !isLite ? wrapperHeight : 'auto',
       }}
-      className="relative w-full bg-ink select-none border-b-2 border-bone/20"
+      className="relative w-full bg-ink select-none border-b-2 border-bone/20 content-auto"
       onMouseEnter={() => setCursor('horizontal', 'Scroll')}
       onMouseLeave={resetCursor}
     >
       {/* Sticky Inner Container: top-0 h-screen overflow-clip (NOT hidden) */}
       <div
         className={
-          isDesktop && !prefersReduced
+          isDesktop && !prefersReduced && !isLite
             ? 'sticky top-0 h-screen overflow-clip w-full flex flex-col justify-between py-6 px-6 sm:px-10'
             : 'relative py-16 px-4 sm:px-6 w-full flex flex-col gap-8'
         }
@@ -215,7 +217,7 @@ export function LineupSection({ events }: LineupSectionProps) {
         <div
           ref={trackRef}
           className={
-            isDesktop && !prefersReduced
+            isDesktop && !prefersReduced && !isLite
               ? 'flex items-center gap-8 will-change-transform py-4'
               : 'flex gap-6 overflow-x-auto snap-x snap-mandatory py-6 no-scrollbar'
           }
@@ -267,7 +269,7 @@ export function LineupSection({ events }: LineupSectionProps) {
               <div
                 key={event.id}
                 className={
-                  isDesktop && !prefersReduced
+                  isDesktop && !prefersReduced && !isLite
                     ? 'w-[72vw] max-w-[820px] shrink-0'
                     : 'w-[88vw] sm:w-[420px] shrink-0 snap-start'
                 }

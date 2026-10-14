@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useDeferredValue } from 'react'
+import { useMemo, useState, useEffect, useDeferredValue, lazy, Suspense } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { Button } from '@/components/ui/Button'
 import { Stamp } from '@/components/ui/Stamp'
@@ -13,12 +13,15 @@ import { FilterBar, EmptyState } from '@/components/events/FilterBar'
 import { EventCard } from '@/components/events/EventCard'
 import { WhySection } from '@/components/events/WhySection'
 import { SponsorsSection } from '@/components/events/SponsorsSection'
-import { LineupSection } from '@/components/events/LineupSection'
 import { EventCardSkeleton } from '@/components/ui/Skeletons'
 import { SectionError } from '@/components/ui/SectionError'
 import { useEventsQuery } from '@/features/events/queries'
 import { useLenis, easeOutExpo } from '@/hooks/useLenis'
 import type { EventFilterState } from '@/types/event'
+
+const LazyLineupSection = lazy(() =>
+  import('@/components/events/LineupSection').then((m) => ({ default: m.LineupSection }))
+)
 
 export function LandingPage() {
   const { data, isLoading, isError, error, refetch } = useEventsQuery()
@@ -103,6 +106,38 @@ export function LandingPage() {
       return true
     })
   }, [events, filters, deferredSearch])
+
+  // Progressive rendering of cards: start with 9 cards to drastically reduce initial DOM nodes
+  const [showAllCards, setShowAllCards] = useState(false)
+
+  const isFiltering =
+    filters.category !== 'ALL' ||
+    filters.mode !== 'ALL' ||
+    filters.cost !== 'ALL' ||
+    filters.status !== 'ALL' ||
+    Boolean(deferredSearch.trim())
+
+  const displayedEvents = isFiltering || showAllCards ? filteredEvents : filteredEvents.slice(0, 9)
+
+  useEffect(() => {
+    if (isFiltering || showAllCards) return
+
+    const sentinel = document.getElementById('events-sentinel')
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setShowAllCards(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '400px' }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [isFiltering, showAllCards])
 
   const handleResetFilters = () => {
     setFilters({
@@ -292,16 +327,30 @@ export function LandingPage() {
               {filteredEvents.length === 0 ? (
                 <EmptyState onReset={handleResetFilters} />
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                  <AnimatePresence>
-                    {filteredEvents.map((event, index) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
-                        isEager={index < 3}
-                      />
-                    ))}
-                  </AnimatePresence>
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                    <AnimatePresence>
+                      {displayedEvents.map((event, index) => (
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          isEager={index < 3}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+
+                  {!showAllCards && !isFiltering && filteredEvents.length > 9 && (
+                    <div id="events-sentinel" className="flex justify-center pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCards(true)}
+                        className="px-6 py-3 border-2 border-bone/30 text-bone hover:border-volt hover:text-volt font-mono text-xs uppercase tracking-widest transition-colors duration-200"
+                      >
+                        Load All {filteredEvents.length} Passes ({filteredEvents.length - 9} More)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -324,7 +373,18 @@ export function LandingPage() {
           </div>
         </section>
       ) : hasCachedData ? (
-        <LineupSection events={events} />
+        <Suspense
+          fallback={
+            <section id="lineup" className="py-20 border-b-2 border-bone/20 bg-ink">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+                <div className="w-48 h-8 bg-bone/10 animate-pulse" />
+                <EventCardSkeleton />
+              </div>
+            </section>
+          }
+        >
+          <LazyLineupSection events={events} />
+        </Suspense>
       ) : (
         <section id="lineup" className="py-16 border-b-2 border-bone/20 bg-ink">
           <SectionError

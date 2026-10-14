@@ -114,11 +114,13 @@ export function EventDetailPage() {
     const lenis = getLenis()
     if (activeBentoId || lightboxImage) {
       lenis?.stop()
+      document.body.style.overflow = 'hidden'
       setTimeout(() => {
         modalPanelRef.current?.focus()
       }, 50)
     } else {
       lenis?.start()
+      document.body.style.overflow = ''
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -135,6 +137,7 @@ export function EventDetailPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       lenis?.start()
+      document.body.style.overflow = ''
     }
   }, [activeBentoId, lightboxImage, getLenis, closeBento])
 
@@ -1244,7 +1247,7 @@ export function EventDetailPage() {
       <AnimatePresence>
         {activeBentoItem && (
           <div
-            className="fixed inset-0 z-50 bg-ink/90 flex items-center justify-center p-4 sm:p-6"
+            className="fixed inset-0 z-50 bg-ink/90 flex items-end sm:items-center justify-center p-0 sm:p-6"
             onClick={closeBento}
           >
             <motion.div
@@ -1256,9 +1259,21 @@ export function EventDetailPage() {
               layoutId={`bento-card-${activeBentoItem.id}`}
               onClick={(e) => e.stopPropagation()}
               onScroll={handleModalScroll}
+              drag={typeof window !== 'undefined' && window.innerWidth < 768 ? 'y' : false}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.5 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 100) closeBento()
+              }}
               data-lenis-prevent
-              className="relative w-full max-w-3xl max-h-[85vh] bg-ink border-2 border-bone/35 overflow-y-auto p-6 sm:p-10 space-y-6 shadow-2xl focus:outline-none"
+              className="relative w-full max-w-3xl max-h-[92vh] sm:max-h-[85vh] bg-ink border-t-2 sm:border-2 border-bone/35 overflow-y-auto p-6 sm:p-10 space-y-6 shadow-2xl focus:outline-none rounded-t-2xl sm:rounded-none"
             >
+              {/* Mobile Drag Handle */}
+              <div
+                aria-hidden="true"
+                className="w-12 h-1.5 bg-bone/30 rounded-full mx-auto sm:hidden -mt-2 mb-3 cursor-grab"
+              />
+
               {/* Top Modal Controls */}
               <div className="flex items-center justify-between border-b-2 border-bone/20 pb-4">
                 <div className="flex items-center gap-3">

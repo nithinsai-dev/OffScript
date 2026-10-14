@@ -21,9 +21,10 @@ export function SplitText({
   by = 'chars',
 }: SplitTextProps) {
   const prefersReduced = usePrefersReducedMotion()
+  const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
   const Tag = tag
 
-  if (prefersReduced) {
+  if (prefersReduced || isLite) {
     return <Tag className={className}>{text}</Tag>
   }
 
@@ -36,8 +37,8 @@ export function SplitText({
           <span key={i} className="inline-block overflow-hidden mr-[0.25em] last:mr-0">
             <motion.span
               className={`inline-block ${charClassName}`}
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
               transition={{
                 duration: 0.65,
                 ease: [0.16, 1, 0.3, 1],
@@ -52,7 +53,7 @@ export function SplitText({
     )
   }
 
-  // Split by characters
+  // Split by characters (desktop full mode only)
   const words = text.split(' ')
 
   return (
@@ -65,8 +66,8 @@ export function SplitText({
               <span key={charIdx} className="inline-block overflow-hidden">
                 <motion.span
                   className={`inline-block ${charClassName}`}
-                  initial={{ y: '110%', opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
+                  initial={{ y: '100%' }}
+                  animate={{ y: 0 }}
                   transition={{
                     duration: 0.55,
                     ease: [0.16, 1, 0.3, 1],

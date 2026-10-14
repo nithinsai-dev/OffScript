@@ -33,43 +33,44 @@ export function LenisProvider({ children }: { children: ReactNode }) {
   const lenisRef = useRef<Lenis | null>(null)
 
   useEffect(() => {
-    // If reduced motion is preferred, use native scrolling without lerp smoothing
-    if (prefersReduced) {
-      ScrollTrigger.refresh()
-      return () => {
-        ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
-      }
+    // If reduced motion or lite mode is active, use native scrolling without lerp smoothing
+    const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
+    if (prefersReduced || isLite) {
+      return
     }
 
-    const lenis = new Lenis({
-      duration: 0.9,
-      easing: easeOutExpo,
-      smoothWheel: true,
-      touchMultiplier: 1.5,
+    let cleanup: (() => void) | undefined
+    const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
+    const handle = schedule(() => {
+      const lenis = new Lenis({
+        duration: 0.9,
+        easing: easeOutExpo,
+        smoothWheel: true,
+        touchMultiplier: 1.5,
+      })
+
+      lenisRef.current = lenis
+
+      // Sync Lenis scroll with GSAP ScrollTrigger
+      lenis.on('scroll', ScrollTrigger.update)
+
+      const tickerCallback = (time: number) => {
+        lenis.raf(time * 1000)
+      }
+
+      gsap.ticker.add(tickerCallback)
+      gsap.ticker.lagSmoothing(0)
+
+      cleanup = () => {
+        gsap.ticker.remove(tickerCallback)
+        lenis.destroy()
+        lenisRef.current = null
+      }
     })
 
-    lenisRef.current = lenis
-
-    // Sync Lenis scroll with GSAP ScrollTrigger
-    lenis.on('scroll', ScrollTrigger.update)
-
-    const tickerCallback = (time: number) => {
-      lenis.raf(time * 1000)
-    }
-
-    gsap.ticker.add(tickerCallback)
-    gsap.ticker.lagSmoothing(0)
-
-    // Initial refresh after mount
-    setTimeout(() => {
-      ScrollTrigger.refresh()
-    }, 100)
-
     return () => {
-      gsap.ticker.remove(tickerCallback)
-      lenis.destroy()
-      lenisRef.current = null
-      ScrollTrigger.getAll().forEach((trigger) => trigger.kill())
+      if (window.cancelIdleCallback) window.cancelIdleCallback(handle as number)
+      if (cleanup) cleanup()
     }
   }, [prefersReduced])
 
