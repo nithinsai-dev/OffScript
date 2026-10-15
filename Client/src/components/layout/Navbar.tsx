@@ -78,6 +78,85 @@ export function Navbar() {
 
   const isLockedRef = useRef(false)
   const lockTimerRef = useRef<number | null>(null)
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null)
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [routerState.location.pathname])
+
+  // Lock scroll while mobile menu is open, ALWAYS unlock after
+  useEffect(() => {
+    const lenis = getLenis()
+    if (mobileMenuOpen) {
+      lenis?.stop()
+      document.body.style.overflow = 'hidden'
+    } else {
+      lenis?.start()
+      document.body.style.overflow = ''
+    }
+
+    return () => {
+      lenis?.start()
+      document.body.style.overflow = ''
+    }
+  }, [mobileMenuOpen, getLenis])
+
+  // Escape key closes mobile menu
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [mobileMenuOpen])
+
+  // Focus trap inside mobile menu drawer
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const container = mobileMenuRef.current
+    if (!container) return
+
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    )
+    if (focusable.length > 0) {
+      focusable[0].focus()
+    }
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const currentFocusable = Array.from(
+        container.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      )
+      if (currentFocusable.length === 0) return
+
+      const firstEl = currentFocusable[0]
+      const lastEl = currentFocusable[currentFocusable.length - 1]
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstEl) {
+          e.preventDefault()
+          lastEl.focus()
+        }
+      } else {
+        if (document.activeElement === lastEl) {
+          e.preventDefault()
+          firstEl.focus()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleTabKey)
+    return () => window.removeEventListener('keydown', handleTabKey)
+  }, [mobileMenuOpen])
 
   const handlePrefetchEvents = () => {
     router.preloadRoute({ to: '/events' })
@@ -256,13 +335,13 @@ export function Navbar() {
                 Register
               </Button>
 
-              {/* Mobile Hamburger Toggle */}
+              {/* Mobile Hamburger Toggle (At least 44x44px tap target) */}
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
                 aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                 aria-expanded={mobileMenuOpen}
-                className="md:hidden flex flex-col items-center justify-center w-8 h-8 border border-bone/30 text-bone hover:border-volt hover:text-volt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt"
+                className="md:hidden flex flex-col items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] border border-bone/30 text-bone hover:border-volt hover:text-volt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt select-none"
               >
                 <span
                   className={`block h-0.5 w-4 bg-current transition-transform duration-200 ${
@@ -298,11 +377,15 @@ export function Navbar() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
+            ref={mobileMenuRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile Navigation Menu"
             initial={{ opacity: 0, clipPath: 'polygon(0 0, 100% 0, 100% 0, 0 0)' }}
             animate={{ opacity: 1, clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)' }}
             exit={{ opacity: 0, clipPath: 'polygon(0 0, 100% 0, 100% 0, 0 0)' }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-40 bg-ink/98 flex flex-col justify-between p-8 pt-28 md:hidden"
+            className="fixed inset-0 z-40 bg-ink/98 flex flex-col justify-between p-6 sm:p-8 pt-24 md:hidden overflow-y-auto"
           >
             <div className="space-y-6">
               <span className="font-mono text-xs uppercase tracking-widest text-volt block">
@@ -318,7 +401,7 @@ export function Navbar() {
                     transition={{ delay: 0.05 * idx, duration: 0.25 }}
                     type="button"
                     onClick={() => handleLinkClick(link.id)}
-                    className="text-left font-display text-2xl sm:text-3xl font-black uppercase text-bone hover:text-volt transition-colors py-2 border-b border-bone/10 flex items-center justify-between"
+                    className="text-left font-display text-2xl sm:text-3xl font-black uppercase text-bone hover:text-volt transition-colors py-3 min-h-[48px] border-b border-bone/10 flex items-center justify-between"
                   >
                     <span>{link.label}</span>
                     <span className="font-mono text-xs text-bone/40">0{idx + 1}</span>

@@ -1,356 +1,613 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
+import { motion, useMotionValue } from 'motion/react'
 import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { TicketShape, TicketBarcode } from '@/components/ui/TicketShape'
-import { Stamp } from '@/components/ui/Stamp'
 import { Button } from '@/components/ui/Button'
-import { formatPrice, formatTeamSize } from '@/lib/formatters'
-import { FALLBACK_COVER_IMAGE } from '@/lib/schemas'
-import { useLenis, easeOutExpo } from '@/hooks/useLenis'
-import { useCursor } from '@/hooks/useCursor'
+import { formatPrice } from '@/lib/formatters'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { MOTION_SCALE } from '@/lib/motion'
 import type { Event } from '@/types/event'
-
-gsap.registerPlugin(ScrollTrigger)
 
 interface LineupSectionProps {
   events: Event[]
+  isLoading?: boolean
+  isError?: boolean
 }
 
-export function LineupSection({ events }: LineupSectionProps) {
-  const { scrollTo } = useLenis()
-  const { setCursor, resetCursor } = useCursor()
-  const prefersReduced = usePrefersReducedMotion()
+/**
+ * Filter and sort lineup events:
+ * 1. Sort by schedule_summary start date and time ascending (+05:30 offset).
+ * 2. Take upcoming events first (from now).
+ * 3. If fewer than 8 upcoming, fill with most recent past ones marked 'COMPLETED'.
+ * 4. Max 8 tickets.
+ */
+export function getLineupEvents(events: Event[]): Event[] {
+  const now = Date.now()
 
-  const wrapperRef = useRef<HTMLElement | null>(null)
-  const trackRef = useRef<HTMLDivElement | null>(null)
-
-  const [progress, setProgress] = useState(0)
-  const [activeIndex, setActiveIndex] = useState(1)
-  const [isDesktop, setIsDesktop] = useState(false)
-  const [wrapperHeight, setWrapperHeight] = useState<number | string>('300vh')
-
-  // Sort upcoming events by start date, pick top 8
-  const displayEvents = useMemo(() => {
-    const list = [...events].sort((a, b) => {
-      const timeA = new Date(a.schedule_summary?.start_date || a.registration_deadline || '').getTime() || 0
-      const timeB = new Date(b.schedule_summary?.start_date || b.registration_deadline || '').getTime() || 0
-      return timeA - timeB
-    })
-    return list.slice(0, 8)
-  }, [events])
-
-  // Track responsive screen width (>=1024px desktop)
-  useEffect(() => {
-    const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= 1024)
-    }
-    checkDesktop()
-    window.addEventListener('resize', checkDesktop)
-    return () => window.removeEventListener('resize', checkDesktop)
-  }, [])
-
-  // Calculate layout dimensions for the sticky technique
-  const recomputeLayout = useCallback(() => {
-    if (!trackRef.current || !wrapperRef.current) return
-    const track = trackRef.current
-    const scrollWidth = track.scrollWidth
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    // Track scroll travel distance: track scrollWidth - viewportWidth + end padding
-    const totalTravel = Math.max(0, scrollWidth - viewportWidth + 96)
-    // Capped at about 2.5 extra viewport heights
-    const maxTravel = Math.min(totalTravel, viewportHeight * 2.5)
-    const computedHeight = maxTravel + viewportHeight
-
-    setWrapperHeight(computedHeight)
-    console.log(
-      `[Lineup] scrollWidth: ${scrollWidth}px, viewportWidth: ${viewportWidth}px, totalTravel: ${totalTravel}px, wrapperHeight: ${computedHeight}px`
-    )
-    ScrollTrigger.refresh()
-  }, [])
-
-  // GSAP Sticky Technique Horizontal Scroll (without ScrollTrigger pin)
-  useEffect(() => {
-    if (!isDesktop || prefersReduced || displayEvents.length === 0) return
-
-    const wrapper = wrapperRef.current
-    const track = trackRef.current
-    if (!wrapper || !track) return
-
-    recomputeLayout()
-
-    const ctx = gsap.context(() => {
-      gsap.to(track, {
-        x: () => {
-          const scrollWidth = track.scrollWidth
-          const viewportWidth = window.innerWidth
-          const totalTravel = Math.max(0, scrollWidth - viewportWidth + 96)
-          return -totalTravel
-        },
-        ease: 'none',
-        scrollTrigger: {
-          trigger: wrapper,
-          start: 'top top',
-          end: 'bottom bottom',
-          scrub: 0.6,
-          invalidateOnRefresh: true,
-          onUpdate: (self) => {
-            setProgress(self.progress)
-            const calculatedIdx = Math.min(
-              displayEvents.length,
-              Math.max(1, Math.round(self.progress * (displayEvents.length - 1)) + 1)
-            )
-            setActiveIndex(calculatedIdx)
-          },
-        },
-      })
-    }, wrapper)
-
-    // Recompute with ResizeObserver, document.fonts.ready, and image load events
-    const ro = new ResizeObserver(() => {
-      recomputeLayout()
-    })
-    ro.observe(track)
-
-    document.fonts.ready.then(() => {
-      recomputeLayout()
-    })
-
-    const imgs = track.querySelectorAll('img')
-    imgs.forEach((img) => {
-      if (img.complete) {
-        recomputeLayout()
-      } else {
-        img.addEventListener('load', recomputeLayout)
-      }
-    })
-
-    window.addEventListener('resize', recomputeLayout)
-
-    return () => {
-      ctx.revert()
-      ro.disconnect()
-      window.removeEventListener('resize', recomputeLayout)
-      imgs.forEach((img) => img.removeEventListener('load', recomputeLayout))
-    }
-  }, [isDesktop, prefersReduced, displayEvents.length, recomputeLayout])
-
-  if (displayEvents.length === 0) return null
-
-  const handleSkipToFooter = () => {
-    scrollTo('#footer', {
-      offset: 0,
-      duration: 0.9,
-      easing: easeOutExpo,
-    })
+  const parseEventTime = (e: Event): number => {
+    const dateStr = e.schedule_summary?.start_date || e.registration_deadline || ''
+    const timeStr = e.schedule_summary?.start_time || '00:00'
+    if (!dateStr) return 0
+    const isoString = dateStr.includes('T')
+      ? dateStr
+      : `${dateStr}T${timeStr.length === 5 ? timeStr : '00:00'}:00+05:30`
+    const parsed = new Date(isoString).getTime()
+    return Number.isNaN(parsed) ? 0 : parsed
   }
 
+  // Sort ascending by start time
+  const sorted = [...events].sort((a, b) => parseEventTime(a) - parseEventTime(b))
+
+  const upcoming = sorted.filter(
+    (e) => parseEventTime(e) >= now && e.event_status !== 'COMPLETED'
+  )
+
+  const past = sorted
+    .filter((e) => parseEventTime(e) < now || e.event_status === 'COMPLETED')
+    .sort((a, b) => parseEventTime(b) - parseEventTime(a)) // Most recent past first
+
+  let chosen = upcoming.slice(0, 8)
+  if (chosen.length < 8) {
+    const needed = 8 - chosen.length
+    chosen = [...chosen, ...past.slice(0, needed)]
+  }
+
+  const final8 = chosen.slice(0, 8)
+
+  // Verification log required by prompt
+  if (import.meta.env.DEV) {
+    console.debug(
+      '[Lineup] 8 chosen events (upcoming first, +05:30):',
+      final8.map((e) => ({
+        id: e.id,
+        name: e.name,
+        date: e.schedule_summary?.start_date,
+        time: e.schedule_summary?.start_time,
+        status: e.event_status,
+      }))
+    )
+  }
+
+  return final8
+}
+
+function parseDateComponents(dateStr?: string) {
+  if (!dateStr) return { day: '--', month: 'TBA' }
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) {
+    return { day: dateStr.slice(-2), month: 'TBA' }
+  }
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+  return { day, month }
+}
+
+export function LineupSection({ events = [], isLoading, isError }: LineupSectionProps) {
+  const prefersReduced = usePrefersReducedMotion()
   const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
+
+  const displayEvents = useMemo(() => getLineupEvents(events), [events])
+  const total = displayEvents.length
+
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const isTransitioningRef = useRef(false)
+  const failsafeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const topTicketRef = useRef<HTMLDivElement | null>(null)
+  const dragX = useMotionValue(0)
+
+  // Release transition lock helper
+  const unlock = useCallback(() => {
+    isTransitioningRef.current = false
+    if (failsafeTimerRef.current) {
+      clearTimeout(failsafeTimerRef.current)
+      failsafeTimerRef.current = null
+    }
+  }, [])
+
+  const setLock = useCallback(() => {
+    isTransitioningRef.current = true
+    if (failsafeTimerRef.current) clearTimeout(failsafeTimerRef.current)
+    failsafeTimerRef.current = setTimeout(unlock, 1000)
+  }, [unlock])
+
+  const goNext = useCallback(() => {
+    if (total <= 1 || isTransitioningRef.current) return
+    setLock()
+
+    if (prefersReduced) {
+      setCurrentIndex((prev) => (prev + 1) % total)
+      unlock()
+      return
+    }
+
+    if (isLite) {
+      const el = topTicketRef.current
+      if (el) {
+        gsap.to(el, {
+          opacity: 0,
+          duration: 0.25,
+          onComplete: () => {
+            setCurrentIndex((prev) => (prev + 1) % total)
+            gsap.set(el, { opacity: 1 })
+            unlock()
+          },
+        })
+      } else {
+        setCurrentIndex((prev) => (prev + 1) % total)
+        unlock()
+      }
+      return
+    }
+
+    // Full Mode Next Transition:
+    // Top ticket slides off to the right while rotating ~8deg (0.5s, power2.in)
+    // then goes to the back while the next ticket lifts into top position (0.45s)
+    const el = topTicketRef.current
+    if (el) {
+      gsap.to(el, {
+        x: 340,
+        rotation: 8,
+        opacity: 0,
+        duration: 0.5 * MOTION_SCALE,
+        ease: 'power2.in',
+        onComplete: () => {
+          setCurrentIndex((prev) => (prev + 1) % total)
+          gsap.set(el, { x: 0, rotation: 0, opacity: 1 })
+          unlock()
+        },
+      })
+    } else {
+      setCurrentIndex((prev) => (prev + 1) % total)
+      unlock()
+    }
+  }, [total, prefersReduced, isLite, setLock, unlock])
+
+  const goPrev = useCallback(() => {
+    if (total <= 1 || isTransitioningRef.current) return
+    setLock()
+
+    if (prefersReduced) {
+      setCurrentIndex((prev) => (prev - 1 + total) % total)
+      unlock()
+      return
+    }
+
+    if (isLite) {
+      const el = topTicketRef.current
+      if (el) {
+        gsap.to(el, {
+          opacity: 0,
+          duration: 0.25,
+          onComplete: () => {
+            setCurrentIndex((prev) => (prev - 1 + total) % total)
+            gsap.set(el, { opacity: 1 })
+            unlock()
+          },
+        })
+      } else {
+        setCurrentIndex((prev) => (prev - 1 + total) % total)
+        unlock()
+      }
+      return
+    }
+
+    // Full Mode Prev Transition:
+    // Reverse slide: ticket swoops in from the right into top position
+    const el = topTicketRef.current
+    if (el) {
+      gsap.fromTo(
+        el,
+        { x: 340, rotation: -8, opacity: 0 },
+        {
+          x: 0,
+          rotation: 0,
+          opacity: 1,
+          duration: 0.45 * MOTION_SCALE,
+          ease: 'power2.out',
+          onComplete: () => {
+            unlock()
+          },
+        }
+      )
+      setCurrentIndex((prev) => (prev - 1 + total) % total)
+    } else {
+      setCurrentIndex((prev) => (prev - 1 + total) % total)
+      unlock()
+    }
+  }, [total, prefersReduced, isLite, setLock, unlock])
+
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      goNext()
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      goPrev()
+    } else if (e.key === 'Escape') {
+      // Escape explicitly does nothing per instructions
+    }
+  }
+
+  // Jump to specific index from date index click
+  const jumpToIndex = (targetIdx: number) => {
+    if (targetIdx === currentIndex || isTransitioningRef.current) return
+    setLock()
+    setCurrentIndex(targetIdx)
+    setTimeout(unlock, 300)
+  }
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (failsafeTimerRef.current) clearTimeout(failsafeTimerRef.current)
+    }
+  }, [])
+
+  // SKELETON LOADING STATE
+  if (isLoading) {
+    return (
+      <section
+        id="lineup"
+        className="relative w-full bg-ink select-none border-b-2 border-bone/20 py-16 px-4 sm:px-6"
+      >
+        <div className="max-w-5xl mx-auto space-y-8">
+          <div className="flex items-center justify-between border-b-2 border-bone/15 pb-4">
+            <div className="h-8 w-48 bg-bone/10 animate-pulse clip-chamfer" />
+            <div className="h-6 w-24 bg-bone/10 animate-pulse" />
+          </div>
+          <div className="relative h-[320px] max-w-xl mx-auto flex items-center justify-center">
+            <div className="w-full h-64 border-2 border-bone/20 bg-bone/5 animate-pulse clip-chamfer" />
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  // EMPTY / ERROR STATE
+  if (isError || total === 0) {
+    return (
+      <section
+        id="lineup"
+        className="relative w-full bg-ink select-none border-b-2 border-bone/20 py-20 px-4 sm:px-6"
+      >
+        <div className="max-w-xl mx-auto text-center space-y-4">
+          <span className="w-2.5 h-2.5 bg-volt rotate-45 inline-block" />
+          <h2 className="font-display text-2xl font-black uppercase text-bone">
+            Lineup Passes
+          </h2>
+          <p className="font-mono text-xs text-bone/60">
+            No passes currently scheduled in this cycle.
+          </p>
+          <div className="pt-2">
+            <Link
+              to="/events"
+              className="inline-flex items-center gap-2 font-mono text-xs text-volt uppercase font-black hover:underline"
+            >
+              <span>Browse all events</span>
+              <span>→</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  const currentEvent = displayEvents[currentIndex]
+
+  // Layer offsets and rotations for up to 4 cards
+  // Base layers:
+  // Layer 0: 0px, scale 1.0, 0deg
+  // Layer 1: 14px, scale 0.96, -2deg (hover fan: 22px, -6deg)
+  // Layer 2: 28px, scale 0.92, +1.5deg (hover fan: 40px, +4deg)
+  // Layer 3: 42px, scale 0.88, -1deg (hover fan: 56px, -3deg)
+  const layerTransforms = [
+    { y: 0, scale: 1, rot: 0, fanY: 0, fanRot: 0, z: 30 },
+    { y: 14, scale: 0.96, rot: -2, fanY: 22, fanRot: -6, z: 20 },
+    { y: 28, scale: 0.9216, rot: 1.5, fanY: 40, fanRot: 4, z: 10 },
+    { y: 42, scale: 0.8847, rot: -1, fanY: 56, fanRot: -3, z: 5 },
+  ]
 
   return (
     <section
-      ref={wrapperRef}
       id="lineup"
-      style={{
-        height: isDesktop && !prefersReduced && !isLite ? wrapperHeight : 'auto',
-      }}
-      className="relative w-full bg-ink select-none border-b-2 border-bone/20 content-auto"
-      onMouseEnter={() => setCursor('horizontal', 'Scroll')}
-      onMouseLeave={resetCursor}
+      className="relative w-full bg-ink select-none border-b-2 border-bone/20 py-16 sm:py-20 px-4 sm:px-6 content-auto"
     >
-      {/* Sticky Inner Container: top-0 h-screen overflow-clip (NOT hidden) */}
-      <div
-        className={
-          isDesktop && !prefersReduced && !isLite
-            ? 'sticky top-0 h-screen overflow-clip w-full flex flex-col justify-between py-6 px-6 sm:px-10'
-            : 'relative py-16 px-4 sm:px-6 w-full flex flex-col gap-8'
-        }
-      >
-        {/* Top Bar: Heading, Progress Counter, and Skip to Footer Button */}
-        <div className="flex items-center justify-between gap-4 border-b-2 border-bone/15 pb-4">
-          <div className="flex items-center gap-3 sm:gap-4">
+      <div className="max-w-5xl mx-auto space-y-10">
+        {/* Top Header Row: Title, Counter & Advance Controls */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b-2 border-bone/15 pb-4">
+          <div className="flex items-center gap-3">
             <span className="w-2.5 h-2.5 bg-volt rotate-45 shrink-0" />
-            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-black uppercase text-bone tracking-tight">
+            <h2 className="font-display text-2xl sm:text-3xl font-black uppercase text-bone tracking-tight">
               Event Lineup
             </h2>
             <span className="hidden sm:inline-block font-mono text-xs text-bone/50 uppercase tracking-widest">
-              NEXT 8 UPCOMING PASSES
+              UPCOMING PASSES
             </span>
           </div>
 
-          <div className="flex items-center gap-4 sm:gap-6 font-mono text-xs">
-            {/* Counter ("03 / 08") */}
-            <div className="flex items-center gap-1.5 text-bone/70">
+          <div className="flex items-center gap-4 sm:gap-6 font-mono text-xs w-full sm:w-auto justify-between sm:justify-end">
+            {/* Mono Counter ("03 / 08") */}
+            <div className="flex items-center gap-1.5 text-bone/70" aria-label={`Pass ${currentIndex + 1} of ${total}`}>
               <span className="text-volt font-black text-sm">
-                {String(activeIndex).padStart(2, '0')}
+                {String(currentIndex + 1).padStart(2, '0')}
               </span>
               <span>/</span>
-              <span>{String(displayEvents.length).padStart(2, '0')}</span>
+              <span>{String(total).padStart(2, '0')}</span>
             </div>
 
-            {/* Skip to Footer Button */}
-            <button
-              type="button"
-              onClick={handleSkipToFooter}
-              className="text-xs font-mono uppercase tracking-wider text-bone/60 hover:text-volt transition-colors flex items-center gap-1 border border-bone/20 px-3 py-1 bg-bone/[0.02]"
-            >
-              <span>Skip to Footer</span>
-              <span>↓</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Desktop Progress Bar */}
-        {isDesktop && !prefersReduced && (
-          <div className="w-full h-1 bg-bone/10 my-2 overflow-hidden">
-            <div
-              className="h-full bg-volt origin-left transition-transform duration-75 ease-out"
-              style={{ transform: `scaleX(${progress})` }}
-            />
-          </div>
-        )}
-
-        {/* Track Container (GSAP sticky scrub on desktop, native scroll-snap on mobile) */}
-        <div
-          ref={trackRef}
-          className={
-            isDesktop && !prefersReduced && !isLite
-              ? 'flex items-center gap-8 will-change-transform py-4'
-              : 'flex gap-6 overflow-x-auto snap-x snap-mandatory py-6 no-scrollbar'
-          }
-        >
-          {displayEvents.map((event, idx) => {
-            const stub = (
-              <div className="h-full flex flex-col justify-between items-center py-2 font-mono select-none w-full">
-                {/* Rotated Vertical "ADMIT ONE" */}
-                <div className="w-full flex justify-center py-1">
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-volt font-black">
-                    ADMIT ONE
-                  </span>
-                </div>
-
-                <div className="space-y-1 text-center">
-                  <span className="font-mono text-[9px] text-bone/40 uppercase block">SERIAL</span>
-                  <span className="font-mono text-[11px] text-volt font-black tracking-widest">
-                    #{(event.id || 'PASS').substring(0, 8).toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="space-y-1 w-full flex flex-col items-center">
-                  <span className="font-mono text-[10px] text-bone/50 uppercase block">PRICE</span>
-                  <span className="font-display font-black text-lg text-volt">
-                    {formatPrice(event.price, event.is_per_head)}
-                  </span>
-                  <span className="font-mono text-[10px] text-bone/60">
-                    {event.seats_left != null ? `${event.seats_left} SEATS LEFT` : 'OPEN SEATS'}
-                  </span>
-                  {/* Deterministic Barcode */}
-                  <div className="pt-1">
-                    <TicketBarcode id={event.id} className="w-20" />
-                  </div>
-                </div>
-
-                <Link
-                  to="/events/$eventId"
-                  params={{ eventId: event.id }}
-                  className="pt-2 w-full"
-                >
-                  <Button variant="primary" size="sm" fullWidth cursorLabel="Pass">
-                    Get Pass
-                  </Button>
-                </Link>
-              </div>
-            )
-
-            return (
-              <div
-                key={event.id}
-                className={
-                  isDesktop && !prefersReduced && !isLite
-                    ? 'w-[72vw] max-w-[820px] shrink-0'
-                    : 'w-[88vw] sm:w-[420px] shrink-0 snap-start'
-                }
+            {/* Advance Chamfered Button Pair (Always visible on mobile) */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={goPrev}
+                aria-label="Previous pass"
+                className="clip-chamfer px-3.5 py-1.5 border border-bone/25 bg-bone/[0.03] hover:bg-bone/10 text-bone hover:text-volt font-mono text-xs uppercase font-bold tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt flex items-center gap-1 cursor-pointer min-h-[44px] min-w-[44px] justify-center"
               >
-                <TicketShape
-                  id={event.id}
-                  stubContent={stub}
-                  stubWidth={150}
-                  className="w-full shadow-2xl"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-5 h-full p-2">
-                    {/* Visual Half with counter-parallax */}
-                    <div className="md:col-span-6 relative aspect-video md:aspect-[4/3] overflow-hidden bg-bone/5 border border-bone/15 flex flex-col justify-between p-4">
-                      <img
-                        src={
-                          (event.cover_image_url || FALLBACK_COVER_IMAGE).includes('images.pexels.com')
-                            ? `${(event.cover_image_url || FALLBACK_COVER_IMAGE).split('?')[0]}?auto=compress&cs=tinysrgb&w=600&fit=crop`
-                            : event.cover_image_url || FALLBACK_COVER_IMAGE
-                        }
-                        alt={event.cover_image_alt || event.name}
-                        loading="lazy"
-                        decoding="async"
-                        style={{
-                          transform: isDesktop && !prefersReduced
-                            ? `translateX(${(0.5 - progress) * 36}px) scale(1.08)`
-                            : 'none',
-                        }}
-                        className="absolute inset-0 w-full h-full object-cover opacity-60 transition-transform duration-300"
-                      />
-                      <div className="relative z-10 flex justify-between items-start">
-                        <span className="font-mono text-[10px] uppercase tracking-widest bg-ink/90 border border-bone/30 px-2 py-0.5 text-volt font-bold">
-                          PASS #{String(idx + 1).padStart(2, '0')}
-                        </span>
-                        <Stamp variant="volt" rotate={-2}>
-                          LINEUP
-                        </Stamp>
-                      </div>
-
-                      <div className="relative z-10 font-mono text-[11px] text-bone/80 bg-ink/95 px-2 py-1 border border-bone/25 w-fit">
-                        {event.schedule_summary?.start_date || 'Date TBA'}
-                      </div>
-                    </div>
-
-                    {/* Info Half */}
-                    <div className="md:col-span-6 flex flex-col justify-between space-y-4">
-                      <div className="space-y-3">
-                        <span className="font-mono text-[10px] uppercase tracking-widest text-volt font-bold block">
-                          {event.category || 'CAMPUS EVENT'}
-                        </span>
-                        <h3 className="font-display text-xl sm:text-2xl md:text-3xl font-black uppercase text-bone leading-tight">
-                          {event.name}
-                        </h3>
-                        {event.blurb && (
-                          <p className="font-sans text-xs sm:text-sm text-bone/70 line-clamp-2">
-                            {event.blurb}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 pt-3 border-t border-dashed border-bone/20 font-mono text-xs text-bone/60">
-                        <div className="flex items-center justify-between">
-                          <span>Team: {formatTeamSize(event.min_teamsize, event.max_teamsize)}</span>
-                          <span className="text-volt font-bold">
-                            {formatPrice(event.price, event.is_per_head)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TicketShape>
-              </div>
-            )
-          })}
+                <span>←</span>
+                <span className="hidden sm:inline">PREV</span>
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                aria-label="Next pass"
+                className="clip-chamfer px-3.5 py-1.5 border border-volt bg-volt/10 hover:bg-volt hover:text-ink text-volt font-mono text-xs uppercase font-black tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt flex items-center gap-1 cursor-pointer min-h-[44px] min-w-[44px] justify-center"
+              >
+                <span className="hidden sm:inline">NEXT</span>
+                <span>→</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Bottom Hint */}
-        <div className="hidden lg:flex items-center justify-between font-mono text-[11px] text-bone/40 pt-2 border-t border-bone/10">
-          <span>SCROLL DOWN TO ADVANCE LINEUP</span>
-          <span>RELEASES SMOOTHLY INTO FOOTER</span>
+        {/* Main Deck Container with Accessibility polite region */}
+        <div
+          role="region"
+          aria-roledescription="carousel"
+          aria-label="Campus event passes lineup"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt relative"
+        >
+          {/* A11y Live Polite Region */}
+          <div className="sr-only" aria-live="polite">
+            {`Ticket ${currentIndex + 1} of ${total}: ${currentEvent.name}`}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Desktop Date Index (Beside the deck, left column on desktop) */}
+            <aside className="hidden lg:flex lg:col-span-3 flex-col space-y-1.5 border-r border-bone/15 pr-6 select-none">
+              <span className="font-mono text-[10px] uppercase text-bone/40 tracking-wider pb-2 block">
+                DATE INDEX
+              </span>
+              {displayEvents.map((ev, idx) => {
+                const { day, month } = parseDateComponents(ev.schedule_summary?.start_date)
+                const isActive = idx === currentIndex
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => jumpToIndex(idx)}
+                    className={`text-left font-mono text-xs py-1.5 px-2.5 transition-colors flex items-center justify-between border ${
+                      isActive
+                        ? 'border-volt text-volt font-black bg-volt/[0.04]'
+                        : 'border-transparent text-bone/60 hover:text-bone hover:border-bone/20'
+                    }`}
+                  >
+                    <span>
+                      {day} {month}
+                    </span>
+                    <span className="text-[10px] text-bone/40">
+                      #{String(idx + 1).padStart(2, '0')}
+                    </span>
+                  </button>
+                )
+              })}
+            </aside>
+
+            {/* Ticket Stack Deck: Clipped wrapper with vertical padding so rotated layers never cause horizontal overflow */}
+            <div className="lg:col-span-9 relative w-full overflow-x-clip py-8 px-2 sm:px-4">
+              <div
+                className={`lineup-deck group relative w-full max-w-[560px] mx-auto min-h-[360px] sm:min-h-[290px] flex items-center justify-center ${
+                  isLite || prefersReduced ? '' : 'desktop-hover-fan'
+                }`}
+                style={{ touchAction: 'pan-y' }}
+              >
+                {/* Render up to 4 layers (relative index 0 to 3) */}
+                {Array.from({ length: Math.min(total, 4) }).map((_, layerIdx) => {
+                  const eventIdx = (currentIndex + layerIdx) % total
+                  const event = displayEvents[eventIdx]
+                  const isTop = layerIdx === 0
+                  const transform = layerTransforms[layerIdx]
+
+                  const { day, month } = parseDateComponents(event.schedule_summary?.start_date)
+                  const startTime = event.schedule_summary?.start_time || 'TBA'
+
+                  // Stub date block
+                  const dateStub = (
+                    <div className="h-full w-full flex flex-row sm:flex-col justify-between items-center py-2 px-3 sm:px-1 font-mono select-none">
+                      <div className="space-y-0.5 text-center">
+                        <span className="font-display font-black text-2xl sm:text-3xl text-volt block leading-none">
+                          {day}
+                        </span>
+                        <span className="font-mono text-[10px] text-bone/70 uppercase font-bold block">
+                          {month}
+                        </span>
+                      </div>
+
+                      <div className="text-center py-1">
+                        <span className="font-mono text-[9px] text-bone/40 uppercase block">TIME</span>
+                        <span className="font-mono text-[10px] text-bone/80 font-bold block truncate">
+                          {startTime}
+                        </span>
+                      </div>
+
+                      <div className="w-16 sm:w-20 pt-1 shrink-0 flex justify-center">
+                        <TicketBarcode id={event.id} className="w-16 sm:w-20" />
+                      </div>
+                    </div>
+                  )
+
+                  if (isTop) {
+                    return (
+                      <motion.div
+                        key={event.id}
+                        ref={topTicketRef}
+                        drag="x"
+                        dragConstraints={{ left: 0, right: 0 }}
+                        dragElastic={0.35}
+                        style={{
+                          x: dragX,
+                          touchAction: 'pan-y',
+                          zIndex: transform.z,
+                        }}
+                        onDragEnd={(_, info) => {
+                          if (info.offset.x < -80 || info.velocity.x < -300) {
+                            goNext()
+                          } else if (info.offset.x > 80 || info.velocity.x > 300) {
+                            goPrev()
+                          }
+                        }}
+                        className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
+                      >
+                        <TicketShape
+                          id={`lineup-${event.id}`}
+                          stubContent={dateStub}
+                          stubWidth={130}
+                          tearOnHover={false}
+                          className="w-full h-full shadow-2xl bg-ink"
+                        >
+                          <div className="flex flex-col justify-between h-full p-2 space-y-4">
+                            <div className="space-y-2">
+                              <span className="font-mono text-[10px] uppercase tracking-widest text-volt font-black block">
+                                {event.category || 'CAMPUS PASS'}
+                              </span>
+                              <h3 className="font-display text-lg sm:text-xl md:text-2xl font-black uppercase text-bone leading-tight line-clamp-2">
+                                {event.name}
+                              </h3>
+                            </div>
+
+                            <div className="space-y-3 pt-2 border-t border-dashed border-bone/20 font-mono text-xs">
+                              <div className="flex items-center justify-between text-bone/70">
+                                <span className="font-display font-black text-base sm:text-lg text-volt">
+                                  {formatPrice(event.price, event.is_per_head)}
+                                </span>
+                                <span className="font-mono text-[10px] text-bone/60">
+                                  {event.seats_left != null ? `${event.seats_left} SEATS LEFT` : 'OPEN SEATS'}
+                                </span>
+                              </div>
+
+                              <Link
+                                to="/events/$eventId"
+                                params={{ eventId: event.id }}
+                                className="block w-full pt-1"
+                              >
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  fullWidth
+                                  cursorLabel="View"
+                                >
+                                  View pass →
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                        </TicketShape>
+                      </motion.div>
+                    )
+                  }
+
+                  // Background layers (clickable to advance)
+                  return (
+                    <div
+                      key={event.id}
+                      onClick={() => jumpToIndex(eventIdx)}
+                      style={{
+                        zIndex: transform.z,
+                        transform: `translateY(${transform.y}px) scale(${transform.scale}) rotate(${transform.rot}deg)`,
+                      }}
+                      className={`lineup-layer-${layerIdx} absolute inset-0 w-full h-full transition-transform duration-400 ease-out cursor-pointer opacity-85 hover:opacity-100`}
+                    >
+                      <TicketShape
+                        id={`lineup-layer-${layerIdx}-${event.id}`}
+                        stubContent={dateStub}
+                        stubWidth={130}
+                        tearOnHover={false}
+                        hoverStroke={false}
+                        className="w-full h-full shadow-lg bg-ink pointer-events-none"
+                      >
+                        <div className="flex flex-col justify-between h-full p-2 space-y-4">
+                          <div className="space-y-2">
+                            <span className="font-mono text-[10px] uppercase tracking-widest text-volt font-black block">
+                              {event.category || 'CAMPUS PASS'}
+                            </span>
+                            <h3 className="font-display text-lg sm:text-xl md:text-2xl font-black uppercase text-bone leading-tight line-clamp-2">
+                              {event.name}
+                            </h3>
+                          </div>
+                          <div className="pt-2 border-t border-dashed border-bone/20 font-mono text-xs flex items-center justify-between text-bone/60">
+                            <span className="font-bold text-volt">
+                              {formatPrice(event.price, event.is_per_head)}
+                            </span>
+                            <span className="text-[10px]">
+                              {event.seats_left != null ? `${event.seats_left} SEATS LEFT` : 'OPEN'}
+                            </span>
+                          </div>
+                        </div>
+                      </TicketShape>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Mobile Dot Indicators */}
+              <div className="flex lg:hidden items-center justify-center gap-2 pt-6">
+                {displayEvents.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => jumpToIndex(idx)}
+                    aria-label={`Jump to ticket ${idx + 1}`}
+                    className={`h-1.5 transition-all ${
+                      idx === currentIndex ? 'w-6 bg-volt' : 'w-1.5 bg-bone/30'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Slim Browse All Events Link */}
+        <div className="text-center pt-2">
+          <Link
+            to="/events"
+            className="inline-flex items-center gap-2 font-mono text-xs text-bone/60 hover:text-volt uppercase font-bold tracking-wider transition-colors py-1 px-3 border border-bone/15 hover:border-volt/40 bg-bone/[0.02]"
+          >
+            <span>Browse all events</span>
+            <span>→</span>
+          </Link>
         </div>
       </div>
+
+      {/* Desktop hover fan CSS rules */}
+      <style>{`
+        @media (hover: hover) and (pointer: fine) {
+          .desktop-hover-fan:hover .lineup-layer-1 {
+            transform: translateY(22px) scale(0.96) rotate(-6deg) !important;
+          }
+          .desktop-hover-fan:hover .lineup-layer-2 {
+            transform: translateY(40px) scale(0.9216) rotate(4deg) !important;
+          }
+          .desktop-hover-fan:hover .lineup-layer-3 {
+            transform: translateY(56px) scale(0.8847) rotate(-3deg) !important;
+          }
+        }
+      `}</style>
     </section>
   )
 }
+
+export default LineupSection

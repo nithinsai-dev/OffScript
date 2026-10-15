@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useRouter } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { Badge } from '@/components/ui/Badge'
@@ -18,6 +18,7 @@ const LazyOpenFullPanel = lazy(() => import('@/components/events/OpenFullPanel')
 import { useCountdown } from '@/hooks/useCountdown'
 import { useEventDetailQuery, useEventsQuery } from '@/features/events/queries'
 import { MOTION, scaleMs } from '@/lib/motion'
+import { usePageRevealed, logAnimationStart } from '@/lib/pageReady'
 import {
   formatEventDateTime,
   formatTeamSize,
@@ -32,24 +33,34 @@ export function EventDetailPage() {
   const prefersReduced = usePrefersReducedMotion()
   const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
 
-  // Route shutter transition readiness (starts when shutter reveal is ~60% done)
-  const [isShutterReady, setIsShutterReady] = useState(() => Boolean(isLite || prefersReduced))
+  // Page revealed coordination (awaits curtain/intro clear + 150ms)
+  const isRevealed = usePageRevealed()
+  const isShutterReady = isLite || prefersReduced || isRevealed
 
+  const mobileMainRegisterRef = useRef<HTMLDivElement | null>(null)
+  const [isMainRegisterInView, setIsMainRegisterInView] = useState(true)
+
+  // Track whether mobile main register button is in viewport
   useEffect(() => {
-    const handleShutter60 = () => {
-      setIsShutterReady(true)
-    }
-    window.addEventListener('offscript:shutter-reveal-60', handleShutter60)
-    // Direct load fallback timer
-    const fallbackTimer = setTimeout(() => {
-      setIsShutterReady(true)
-    }, scaleMs(1400))
+    const el = mobileMainRegisterRef.current
+    if (!el) return
 
-    return () => {
-      window.removeEventListener('offscript:shutter-reveal-60', handleShutter60)
-      clearTimeout(fallbackTimer)
-    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsMainRegisterInView(entry.isIntersecting)
+      },
+      { threshold: 0.05 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [])
+
+  // Log hero animation start timestamp
+  useEffect(() => {
+    if (isRevealed) {
+      logAnimationStart('Event Detail Hero')
+    }
+  }, [isRevealed])
   const { data: allEventsData } = useEventsQuery()
   const allEvents = useMemo(() => allEventsData?.events ?? [], [allEventsData?.events])
 
@@ -523,26 +534,33 @@ export function EventDetailPage() {
           id="event-hero-banner"
           hasPerforation={false}
           bodyClassName="p-0"
-          className="w-full aspect-[21/9] sm:aspect-[24/9] group"
+          className="w-full aspect-[21/9] sm:aspect-[24/9] group overflow-hidden"
         >
-          <img
-            src={heroImageSrc}
-            alt={event.banner_image_alt || event.name}
-            onError={() => setImageError(true)}
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            width={1200}
-            height={500}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-          />
+          <motion.div
+            initial={isLite || prefersReduced ? undefined : { clipPath: 'inset(100% 0 0 0)' }}
+            animate={isLite || prefersReduced || isRevealed ? { clipPath: 'inset(0% 0 0 0)' } : { clipPath: 'inset(100% 0 0 0)' }}
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full h-full relative"
+          >
+            <img
+              src={heroImageSrc}
+              alt={event.banner_image_alt || event.name}
+              onError={() => setImageError(true)}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              width={1200}
+              height={500}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            />
 
-          {/* Stamp Badge Overlay */}
-          <div className="absolute top-4 left-4 z-10">
-            <Stamp variant="volt" rotate={-2}>
-              {event.category || 'CAMPUS PASS'}
-            </Stamp>
-          </div>
+            {/* Stamp Badge Overlay */}
+            <div className="absolute top-4 left-4 z-10">
+              <Stamp variant="volt" rotate={-2}>
+                {event.category || 'CAMPUS PASS'}
+              </Stamp>
+            </div>
+          </motion.div>
         </TicketShape>
 
         {/* Big Event Name & Info Pills */}
@@ -570,7 +588,9 @@ export function EventDetailPage() {
 
       {/* MOBILE ONLY: INFO TICKET & STICKY NOTE DIRECTLY AFTER HERO (NON-STICKY) */}
       <div className="lg:hidden max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
-        {infoTicketPanel}
+        <div ref={mobileMainRegisterRef}>
+          {infoTicketPanel}
+        </div>
         {stickyNote}
       </div>
 
@@ -649,6 +669,50 @@ export function EventDetailPage() {
           />
         </Suspense>
       )}
+
+      {/* MOBILE ONLY: BOTTOM-FIXED COMPACT REGISTER BAR (Only when main register button scrolled out of view) */}
+      <AnimatePresence>
+        {!isMainRegisterInView && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-ink/95 border-t-2 border-bone/25 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,12px))] backdrop-blur-md flex items-center justify-between gap-4 shadow-2xl"
+          >
+            <div className="space-y-0.5 min-w-0">
+              <div className="font-display font-black text-xl text-volt leading-none truncate">
+                {priceDisplay}
+              </div>
+              <span className="font-mono text-[10px] uppercase text-bone/60 block truncate">
+                {priceBillingUnit} • {formatTeamSize(event.min_teamsize, event.max_teamsize)}
+              </span>
+            </div>
+
+            {isRegistrationOpen ? (
+              <Button
+                variant="primary"
+                size="sm"
+                href={registrationHref}
+                target="_blank"
+                rel="noreferrer"
+                cursorLabel="Register"
+                className="py-2 px-4 text-xs font-bold font-mono tracking-wider shrink-0"
+              >
+                Register Now
+              </Button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDisabledClick}
+                className="py-2 px-4 border border-bone/30 bg-bone/5 text-bone/50 font-mono text-xs uppercase font-bold tracking-wider cursor-not-allowed shrink-0"
+              >
+                Closed
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </article>
   )
 }

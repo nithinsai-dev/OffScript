@@ -21,7 +21,10 @@ export function BackToTop() {
           exit={{ opacity: 0, scale: 0.8, y: 15 }}
           transition={{ duration: 0.2 }}
           aria-label="Scroll to top of page"
-          className="fixed bottom-6 right-6 z-40 group flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-ink rounded-full border border-bone/25 text-bone shadow-hard-bone hover:border-volt hover:text-volt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt select-none"
+          className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 group flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-ink border-2 border-bone/30 text-bone shadow-hard-bone hover:border-volt hover:text-volt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt select-none"
+          style={{
+            clipPath: 'polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px)',
+          }}
         >
           {/* Circular SVG Scroll Progress Ring */}
           <svg

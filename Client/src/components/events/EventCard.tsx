@@ -243,6 +243,8 @@ function EventCardComponent({ event, isEager = false, className = '' }: EventCar
                 alt={event.cover_image_alt || event.name}
                 loading={isEager ? 'eager' : 'lazy'}
                 decoding="async"
+                width={400}
+                height={225}
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
                 className="w-full h-full object-cover"

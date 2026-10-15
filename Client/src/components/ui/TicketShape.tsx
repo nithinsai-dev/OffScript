@@ -10,6 +10,7 @@ interface TicketShapeProps {
   className?: string
   bodyClassName?: string
   stubWidth?: number // desktop stub width (default 130px)
+  stubHeight?: number // mobile stub height (default 110px)
   isHovered?: boolean
   tearOnHover?: boolean // ONLY true for Featured stacking cards
   hoverStroke?: boolean // default true, false disables hover border color change
@@ -153,6 +154,7 @@ export function TicketShape({
   className = '',
   bodyClassName,
   stubWidth = 170,
+  stubHeight = 110,
   isHovered: externalHover,
   tearOnHover = false,
   hoverStroke = true,
@@ -220,8 +222,7 @@ export function TicketShape({
   const { width: W, height: H } = dimensions
 
   // Desktop: stub is right column of width `stubWidth`. Perforation is at `W - stubWidth`.
-  // Mobile: stub is bottom row of height 110px. Perforation is at `H - 110`.
-  const stubHeight = 110
+  // Mobile: stub is bottom row of height `stubHeight`. Perforation is at `H - stubHeight`.
   const P = isMobile ? Math.max(80, H - stubHeight) : Math.max(120, W - stubWidth)
 
   const R_perf = 9

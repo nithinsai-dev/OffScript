@@ -27,6 +27,7 @@ html {
   background-color: #111210;
   color: #EDEBE0;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  overflow-x: clip;
 }
 
 body {
@@ -917,6 +918,13 @@ html[data-perf="lite"] [data-reveal].is-revealed {
 .hero-title-char {
   display: inline-block;
   will-change: transform;
+}
+
+.hero-title-char-pending {
+  transform: translateY(0.4em); /* LCP safe, transform-only, painted at normal time */
+}
+
+.hero-title-char-animate {
   animation: heroTitleCharRise calc(1.3s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: calc(var(--char-index, 0) * 0.045s * var(--motion-scale, 1));
 }

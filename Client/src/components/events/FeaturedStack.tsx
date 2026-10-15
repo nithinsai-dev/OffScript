@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { TicketShape, TicketBarcode } from '@/components/ui/TicketShape'
@@ -9,6 +9,7 @@ import { formatPrice, formatTeamSize } from '@/lib/formatters'
 import { FALLBACK_COVER_IMAGE } from '@/lib/schemas'
 import { useCursor } from '@/hooks/useCursor'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { usePageRevealed, logAnimationStart } from '@/lib/pageReady'
 import type { Event } from '@/types/event'
 
 interface FeaturedStackProps {
@@ -22,32 +23,37 @@ function FeaturedCardItem({ event, idx }: { event: Event; idx: number }) {
   const isSoldOut = event.registration_status !== 'OPEN'
 
   const stub = (
-    <div className="h-full flex flex-col justify-between items-center py-2 font-mono select-none w-full">
-      <div className="space-y-1 text-center">
-        <span className="font-mono text-[9px] text-bone/40 uppercase block">PASS ID</span>
-        <span className="font-mono text-[11px] text-volt font-black tracking-widest">
+    <div className="h-full w-full flex flex-row sm:flex-col justify-between items-center py-1 sm:py-2 px-1 sm:px-0 font-mono select-none gap-2">
+      {/* 1. PASS ID */}
+      <div className="space-y-0.5 text-left sm:text-center shrink-0">
+        <span className="font-mono text-[8px] sm:text-[9px] text-bone/40 uppercase block">PASS ID</span>
+        <span className="font-mono text-[10px] sm:text-[11px] text-volt font-black tracking-widest block truncate max-w-[80px] sm:max-w-none">
           #{(event.id || 'FEATURED').substring(0, 8).toUpperCase()}
         </span>
       </div>
 
-      <div className="space-y-2 w-full flex flex-col items-center">
-        <span className="font-mono text-[10px] text-bone/50 uppercase block">PRICE</span>
-        <span className="font-display font-black text-xl text-volt">
-          {formatPrice(event.price, event.is_per_head)}
-        </span>
+      {/* 2. PRICE & BARCODE */}
+      <div className="space-y-1 sm:space-y-2 flex flex-row sm:flex-col items-center gap-2 sm:gap-0 shrink-0">
+        <div className="text-center">
+          <span className="font-mono text-[8px] sm:text-[10px] text-bone/50 uppercase block">PRICE</span>
+          <span className="font-display font-black text-sm sm:text-xl text-volt whitespace-nowrap">
+            {formatPrice(event.price, event.is_per_head)}
+          </span>
+        </div>
 
         {/* Animated Barcode */}
-        <div className={`transition-transform duration-300 ${isHovered ? 'scale-110' : 'scale-100'}`}>
+        <div className={`hidden sm:block transition-transform duration-300 ${isHovered ? 'scale-110' : 'scale-100'}`}>
           <TicketBarcode id={event.id} className="w-20" />
         </div>
       </div>
 
+      {/* 3. CTA BUTTON */}
       <Link
         to="/events/$eventId"
         params={{ eventId: event.id }}
-        className="pt-2 w-full"
+        className="pt-0 sm:pt-2 w-auto sm:w-full shrink-0"
       >
-        <Button variant="primary" size="sm" fullWidth cursorLabel="Pass">
+        <Button variant="primary" size="sm" fullWidth cursorLabel="Pass" className="text-[11px] py-1 px-3 sm:py-1.5 sm:px-4">
           Get Pass
         </Button>
       </Link>
@@ -120,6 +126,8 @@ function FeaturedCardItem({ event, idx }: { event: Event; idx: number }) {
                 loading={idx === 0 ? 'eager' : 'lazy'}
                 fetchPriority={idx === 0 ? 'high' : 'auto'}
                 decoding="async"
+                width={600}
+                height={338}
                 className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
               />
             </div>
@@ -168,8 +176,15 @@ function FeaturedCardItem({ event, idx }: { event: Event; idx: number }) {
 }
 
 export function FeaturedStack({ events }: FeaturedStackProps) {
+  const isRevealed = usePageRevealed()
   const featured = events.filter((e) => e.is_featured)
   const displayEvents = (featured.length > 0 ? featured : events).slice(0, 4)
+
+  useEffect(() => {
+    if (isRevealed && displayEvents.length > 0) {
+      logAnimationStart('Featured Intro')
+    }
+  }, [isRevealed, displayEvents.length])
 
   if (displayEvents.length === 0) return null
 

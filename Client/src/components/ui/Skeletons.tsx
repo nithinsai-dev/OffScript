@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 
 /**
@@ -55,32 +55,44 @@ export function EventCardSkeleton() {
   )
 }
 
+import { notifyOverlayActive, notifyOverlayCleared } from '@/lib/pageReady'
+
 /**
- * Initial on-brand Page Loader: under 1.6s, played once per session, skippable.
+ * Initial on-brand Page Loader: under 1.2s, played once per session, skippable.
  * Counter 0 to 100, wordmark wiping in, curtain splitting open to reveal hero.
  */
 export function PageLoader({ onComplete }: { onComplete?: () => void }) {
   const [progress, setProgress] = useState(0)
   const [isSplitting, setIsSplitting] = useState(false)
+  const clearedRef = useRef(false)
+
+  const handleFinish = useCallback(() => {
+    if (clearedRef.current) return
+    clearedRef.current = true
+    notifyOverlayCleared('landing-intro')
+    onComplete?.()
+  }, [onComplete])
 
   useEffect(() => {
+    notifyOverlayActive('landing-intro')
+
     const timer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(timer)
           setIsSplitting(true)
-          setTimeout(() => onComplete?.(), 450)
+          setTimeout(handleFinish, 400)
           return 100
         }
-        const step = Math.floor(Math.random() * 25) + 20
+        const step = Math.floor(Math.random() * 25) + 30
         return Math.min(100, prev + step)
       })
-    }, 60) // Completes in under 1.1s
+    }, 50) // Completes in under 0.8s total
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         clearInterval(timer)
-        onComplete?.()
+        handleFinish()
       }
     }
 
@@ -90,7 +102,7 @@ export function PageLoader({ onComplete }: { onComplete?: () => void }) {
       clearInterval(timer)
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [onComplete])
+  }, [handleFinish])
 
   return (
     <AnimatePresence>

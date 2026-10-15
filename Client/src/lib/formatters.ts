@@ -103,15 +103,11 @@ export function formatPrice(price?: number, isPerHead?: boolean): string {
 }
 
 /**
- * Formats numeric currency amount for prizes (e.g. "₹50,000")
+ * Formats numeric currency amount for prizes (e.g. "Rs 25,000") with en-IN grouping
  */
-export function formatPrizeAmount(amount?: number): string {
-  if (amount === undefined || amount === null || Number.isNaN(amount)) return '₹0'
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount)
+export function formatPrizeAmount(amount?: number): string | null {
+  if (amount === undefined || amount === null || Number.isNaN(amount) || amount <= 0) return null
+  return `Rs ${new Intl.NumberFormat('en-IN').format(amount)}`
 }
 
 /**

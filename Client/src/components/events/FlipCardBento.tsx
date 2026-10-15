@@ -5,6 +5,8 @@ import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 import { SectionError } from '@/components/ui/SectionError'
 import type { EventDetail } from '@/types/event'
 import { MOTION, MOTION_SCALE } from '@/lib/motion'
+import { formatPrizeAmount } from '@/lib/formatters'
+import { logAnimationStart } from '@/lib/pageReady'
 import {
   shouldPlayFullSequence,
   runMechanicalAssemblySequence,
@@ -48,6 +50,7 @@ export function FlipCardBento({
   const isFlipLockedRef = useRef(false)
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const punchedCardsRef = useRef<Set<string>>(new Set())
+  const [punchedCards, setPunchedCards] = useState<Set<string>>(() => new Set())
 
   // Determine whether to play full drop-shatter sequence
   const willRunFull = useMemo(() => {
@@ -235,6 +238,8 @@ export function FlipCardBento({
           return
         }
 
+        logAnimationStart('Event Detail Card Assembly')
+
         if (prefersReduced) {
           cancelSequenceRef.current = runCardFadeSequence(gridEl, cardEls, () => {
             setSequenceDone(true)
@@ -256,28 +261,42 @@ export function FlipCardBento({
   }, [isDetailLoading, cards.length, isInView, isShutterReady, willRunFull, prefersReduced])
 
   // THE SURPRISE: "ticket punch"
-  // When flip settles, pop Volt diamond chip (arcs up 28px, falls with gravity, 0.9s).
-  // "PUNCHED" stamp slams onto back face corner (0.15s scale 1.4 to 1 + 3px card shake).
-  // Plays once per flip, only on first flip of each card in session.
+  // After flip settles: Volt ring scales 0 to 1 in 20px slot (0.2s),
+  // diamond chip pops out of that ring, arcs up ~24px and fades (0.8s),
+  // contained inside card box (overflow hidden, cannot cross footer).
+  // First flip of each card in session only.
+  // Lite mode and reduced motion: ring shows statically, no chip.
   const triggerTicketPunch = useCallback(
     (cardId: string) => {
-      if (isLite || prefersReduced) return
       if (punchedCardsRef.current.has(cardId)) return
       punchedCardsRef.current.add(cardId)
+      setPunchedCards(new Set(punchedCardsRef.current))
+
+      if (isLite || prefersReduced) return
 
       const cardEl = cardRefs.current[cardId]
       if (!cardEl) return
 
-      // 1. Single small Volt diamond chip popping from top edge
+      const slotEl = cardEl.querySelector(`[data-punch-slot="${cardId}"]`) as HTMLElement | null
+      if (!slotEl) return
+
+      // 1. Volt ring scales from 0 to 1 in the 20px slot (0.2s)
+      gsap.fromTo(
+        slotEl,
+        { scale: 0, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.2 * MOTION_SCALE, ease: 'back.out(2)' }
+      )
+
+      // 2. Diamond chip pops out of that ring, arcs up about 24px and fades (0.8s)
       const chip = document.createElement('div')
       chip.className = 'ticket-punch-chip pointer-events-none absolute z-50'
-      chip.style.width = '10px'
-      chip.style.height = '10px'
+      chip.style.width = '8px'
+      chip.style.height = '8px'
       chip.style.backgroundColor = '#D4FF3F'
       chip.style.transform = 'rotate(45deg)'
-      chip.style.left = '48%'
-      chip.style.top = '0px'
-      cardEl.appendChild(chip)
+      chip.style.left = '6px'
+      chip.style.top = '6px'
+      slotEl.appendChild(chip)
 
       const punchTl = gsap.timeline({
         onComplete: () => {
@@ -285,38 +304,22 @@ export function FlipCardBento({
         },
       })
 
+      // Arcs up about 24px (0.35s) then fades out (0.45s) = 0.8s total
       punchTl.to(chip, {
-        y: -28,
-        x: 10,
-        rotation: 75,
-        duration: 0.38 * MOTION_SCALE,
+        y: -24,
+        x: -4,
+        rotation: 90,
+        duration: 0.35 * MOTION_SCALE,
         ease: 'power1.out',
       })
       punchTl.to(chip, {
-        y: 45,
-        x: 20,
-        rotation: 140,
+        y: -10,
+        x: -8,
         opacity: 0,
-        duration: 0.52 * MOTION_SCALE,
+        rotation: 180,
+        duration: 0.45 * MOTION_SCALE,
         ease: 'power2.in',
       })
-
-      // 2. Mono "PUNCHED" stamp slams onto back face corner
-      const stampEl = cardEl.querySelector('.punched-stamp') as HTMLElement | null
-      if (stampEl) {
-        gsap.fromTo(
-          stampEl,
-          { scale: 1.4, opacity: 0, rotation: -6 },
-          { scale: 1, opacity: 1, rotation: -6, duration: 0.15 * MOTION_SCALE, ease: 'power4.in' }
-        )
-      }
-
-      // 3. 3px shake of the card
-      gsap.fromTo(
-        cardEl,
-        { x: 0 },
-        { x: 3, duration: 0.05 * MOTION_SCALE, yoyo: true, repeat: 3, ease: 'power1.inOut' }
-      )
     },
     [isLite, prefersReduced]
   )
@@ -354,6 +357,7 @@ export function FlipCardBento({
       if (isLite || prefersReduced) {
         gsap.set(cardEl, { rotateY: 180 })
         isFlipLockedRef.current = false
+        triggerTicketPunch(cardId)
         setTimeout(() => {
           backHeadingRefs.current[cardId]?.focus()
         }, 50)
@@ -563,61 +567,29 @@ export function FlipCardBento({
     )
   }
 
-  // RENDER BACK FACE PREVIEW (No scrolling, same footprint, dedicated flip back button)
+  // RENDER BACK FACE BODY (Body row in 3-row flex column)
   const renderBackPreview = (cardId: string) => {
     switch (cardId) {
       case 'overview': {
         const text = event?.description || event?.blurb || 'Full pass details available in briefing.'
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-3">
-            <p className="font-sans text-xs text-bone/80 line-clamp-4 leading-relaxed flex-1">
-              {text}
-            </p>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('overview', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt font-mono text-xs uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
-          </div>
+          <p className="font-sans text-xs text-bone/80 leading-relaxed">
+            {text}
+          </p>
         )
       }
 
       case 'highlights': {
         const items = event?.highlights || []
         const previewItems = items.slice(0, 4)
-        const hasMore = items.length > 4
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-1.5 flex-1">
-              {previewItems.map((item, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
-                  <span className="w-1.5 h-1.5 bg-volt mt-1.5 shrink-0 rotate-45" />
-                  <span className="line-clamp-1">{item}</span>
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[11px]">
-                {hasMore ? `+${items.length - 4} more` : `${items.length} perks`}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('highlights', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+          <div className="space-y-1.5">
+            {previewItems.map((item, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
+                <span className="w-1.5 h-1.5 bg-volt mt-1.5 shrink-0 rotate-45" />
+                <span className="line-clamp-2">{item}</span>
+              </div>
+            ))}
           </div>
         )
       }
@@ -625,32 +597,14 @@ export function FlipCardBento({
       case 'expect': {
         const items = event?.what_to_expect || []
         const previewItems = items.slice(0, 3)
-        const hasMore = items.length > 3
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-1.5 flex-1">
-              {previewItems.map((item, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
-                  <span className="w-1.5 h-1.5 bg-volt mt-1.5 shrink-0 rotate-45" />
-                  <span className="line-clamp-1">{item}</span>
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[11px]">
-                {hasMore ? `+${items.length - 3} more` : `${items.length} items`}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('expect', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+          <div className="space-y-1.5">
+            {previewItems.map((item, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
+                <span className="w-1.5 h-1.5 bg-volt mt-1.5 shrink-0 rotate-45" />
+                <span className="line-clamp-2">{item}</span>
+              </div>
+            ))}
           </div>
         )
       }
@@ -658,32 +612,14 @@ export function FlipCardBento({
       case 'prerequisites': {
         const items = event?.prerequisites || []
         const previewItems = items.slice(0, 3)
-        const hasMore = items.length > 3
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-1.5 flex-1">
-              {previewItems.map((item, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
-                  <span className="font-mono text-volt font-bold">›</span>
-                  <span className="line-clamp-1">{item}</span>
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[11px]">
-                {hasMore ? `+${items.length - 3} more` : `${items.length} items`}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('prerequisites', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+          <div className="space-y-1.5">
+            {previewItems.map((item, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
+                <span className="font-mono text-volt font-bold">›</span>
+                <span className="line-clamp-2">{item}</span>
+              </div>
+            ))}
           </div>
         )
       }
@@ -691,34 +627,16 @@ export function FlipCardBento({
       case 'rules': {
         const items = event?.rules || []
         const previewItems = items.slice(0, 3)
-        const hasMore = items.length > 3
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-1.5 flex-1">
-              {previewItems.map((rule, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
-                  <span className="font-mono text-[10px] text-volt bg-ink px-1 border border-volt/40 shrink-0 font-bold">
-                    #{i + 1}
-                  </span>
-                  <span className="line-clamp-1">{rule}</span>
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[11px]">
-                {hasMore ? `+${items.length - 3} more of ${items.length} rules` : `${items.length} rules`}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('rules', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+          <div className="space-y-1.5">
+            {previewItems.map((rule, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
+                <span className="font-mono text-[10px] text-volt bg-ink px-1 border border-volt/40 shrink-0 font-bold">
+                  #{i + 1}
+                </span>
+                <span className="line-clamp-2">{rule}</span>
+              </div>
+            ))}
           </div>
         )
       }
@@ -728,42 +646,26 @@ export function FlipCardBento({
         const summary = event?.schedule_summary
         const dateList = dates.length > 0 ? dates : summary?.start_date ? [{ event_date: summary.start_date, start_time: summary.start_time, end_time: summary.end_time, venue: 'Campus Arena' }] : []
         const previewDates = dateList.slice(0, 2)
-        const hasMore = dateList.length > 2
 
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-2 flex-1">
-              {previewDates.map((item, i) => {
-                const dateObj = new Date(item.event_date)
-                const day = Number.isNaN(dateObj.getTime()) ? item.event_date.slice(-2) : String(dateObj.getDate()).padStart(2, '0')
-                const month = Number.isNaN(dateObj.getTime()) ? 'TBA' : dateObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-                return (
-                  <div key={i} className="flex items-center gap-3 p-2 border border-bone/15 bg-bone/[0.02]">
-                    <div className="border border-bone/25 px-2 py-1 text-center bg-ink shrink-0">
-                      <span className="font-display font-black text-sm text-volt leading-none block">{day}</span>
-                      <span className="font-mono text-[8px] text-bone/60 uppercase block">{month}</span>
-                    </div>
-                    <div className="font-mono text-[11px] text-bone/80 truncate">
-                      <span className="text-volt font-bold block">{item.start_time || 'TBA'}{item.end_time ? ` - ${item.end_time}` : ''}</span>
-                      <span className="text-bone/50 text-[10px] truncate block">{item.venue || 'Campus venue'}</span>
-                    </div>
+          <div className="space-y-2">
+            {previewDates.map((item, i) => {
+              const dateObj = new Date(item.event_date)
+              const day = Number.isNaN(dateObj.getTime()) ? item.event_date.slice(-2) : String(dateObj.getDate()).padStart(2, '0')
+              const month = Number.isNaN(dateObj.getTime()) ? 'TBA' : dateObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+              return (
+                <div key={i} className="flex items-center gap-3 p-2 border border-bone/15 bg-bone/[0.02]">
+                  <div className="border border-bone/25 px-2 py-1 text-center bg-ink shrink-0">
+                    <span className="font-display font-black text-sm text-volt leading-none block">{day}</span>
+                    <span className="font-mono text-[8px] text-bone/60 uppercase block">{month}</span>
                   </div>
-                )
-              })}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[11px]">{hasMore ? `+${dateList.length - 2} more` : 'Full timeline'}</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('schedule', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+                  <div className="font-mono text-[11px] text-bone/80 truncate">
+                    <span className="text-volt font-bold block">{item.start_time || 'TBA'}{item.end_time ? ` - ${item.end_time}` : ''}</span>
+                    <span className="text-bone/50 text-[10px] truncate block">{item.venue || 'Campus venue'}</span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )
       }
@@ -772,32 +674,22 @@ export function FlipCardBento({
         const prizes = event?.prizes || []
         const previewPrizes = prizes.slice(0, 3)
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-2 flex-1">
-              {previewPrizes.map((p, i) => (
+          <div className="space-y-2">
+            {previewPrizes.map((p, i) => {
+              const formatted = formatPrizeAmount(p.amount)
+              return (
                 <div key={i} className="flex items-center justify-between p-2 border border-bone/15 bg-bone/[0.02] font-mono text-xs">
                   <span className="text-bone font-bold truncate max-w-[150px]">
                     #{p.rank || i + 1} {p.title || 'Award'}
                   </span>
-                  <span className="text-volt text-[10px] font-bold uppercase tracking-wider bg-volt/10 px-1.5 py-0.5 border border-volt/30">
-                    Scratch to reveal
-                  </span>
+                  {formatted && (
+                    <span className="text-volt font-bold text-xs shrink-0">
+                      {formatted}
+                    </span>
+                  )}
                 </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[10px]">Canvas scratch cards</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('prizes', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+              )
+            })}
           </div>
         )
       }
@@ -806,28 +698,13 @@ export function FlipCardBento({
         const faqs = event?.faqs || []
         const previewFaqs = faqs.slice(0, 2)
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-2 flex-1">
-              {previewFaqs.map((f, i) => (
-                <div key={i} className="p-2 border border-bone/15 bg-bone/[0.02] space-y-1">
-                  <span className="font-mono text-xs text-volt font-bold line-clamp-1">Q: {f.question}</span>
-                  <span className="font-sans text-[11px] text-bone/70 line-clamp-1 block">{f.answer}</span>
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[11px]">{faqs.length} FAQs</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('faqs', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+          <div className="space-y-2">
+            {previewFaqs.map((f, i) => (
+              <div key={i} className="p-2 border border-bone/15 bg-bone/[0.02] space-y-1">
+                <span className="font-mono text-xs text-volt font-bold line-clamp-1">Q: {f.question}</span>
+                <span className="font-sans text-[11px] text-bone/70 line-clamp-2 block">{f.answer}</span>
+              </div>
+            ))}
           </div>
         )
       }
@@ -836,27 +713,20 @@ export function FlipCardBento({
         const images = event?.gallery_images || []
         const previewImages = images.slice(0, 3)
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="grid grid-cols-3 gap-2 flex-1 items-center">
-              {previewImages.map((img, i) => (
-                <div key={i} className="aspect-video border border-bone/20 overflow-hidden bg-bone/5">
-                  <img src={img} alt={`Gallery preview ${i + 1}`} className="w-full h-full object-cover" />
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[11px]">+{images.length} photos</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('gallery', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+          <div className="grid grid-cols-3 gap-2 items-center">
+            {previewImages.map((img, i) => (
+              <div key={i} className="aspect-video border border-bone/20 overflow-hidden bg-bone/5">
+                <img
+                  src={img}
+                  alt={`Gallery preview ${i + 1}`}
+                  loading="lazy"
+                  decoding="async"
+                  width={200}
+                  height={150}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
           </div>
         )
       }
@@ -865,41 +735,26 @@ export function FlipCardBento({
         const orgs = event?.organizers || []
         const coords = event?.coordinators || []
         return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-2 flex-1 font-mono text-xs">
-              {orgs.length > 0 && (
-                <p className="text-bone font-bold line-clamp-1">
-                  Org: <span className="text-bone/80 font-normal">{orgs.map((o) => o.name).join(', ')}</span>
-                </p>
-              )}
-              {coords.slice(0, 2).map((c, i) => (
-                <div key={i} className="flex items-center justify-between text-[11px] border-b border-bone/10 pb-1">
-                  <span className="text-bone/90">{c.name}</span>
-                  {c.contact && (
-                    <a
-                      href={`mailto:${c.contact}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-volt hover:underline"
-                    >
-                      email ↗
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[10px]">Official Leads</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('contact', e.currentTarget as HTMLElement)
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
+          <div className="space-y-2 font-mono text-xs">
+            {orgs.length > 0 && (
+              <p className="text-bone font-bold line-clamp-1">
+                Org: <span className="text-bone/80 font-normal">{orgs.map((o) => o.name).join(', ')}</span>
+              </p>
+            )}
+            {coords.slice(0, 2).map((c, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px] border-b border-bone/10 pb-1">
+                <span className="text-bone/90">{c.name}</span>
+                {c.contact && (
+                  <a
+                    href={`mailto:${c.contact}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-volt hover:underline"
+                  >
+                    email ↗
+                  </a>
+                )}
+              </div>
+            ))}
           </div>
         )
       }
@@ -1057,7 +912,7 @@ export function FlipCardBento({
                   </div>
                 </button>
 
-                {/* BACK FACE: Same footprint, no scrolling, "BACK" button. Clicking non-interactive area flips back. */}
+                {/* BACK FACE: 3-row flex column with reserved space */}
                 <div
                   aria-hidden={!isFlipped}
                   inert={!isFlipped}
@@ -1071,50 +926,78 @@ export function FlipCardBento({
                     !isFlipped ? 'pointer-events-none' : 'pointer-events-auto'
                   }`}
                 >
-                  {/* Back Face Header with Title and Dedicated Chamfered "BACK" Button */}
+                  {/* ROW 1: HEADER ROW (small label + count on the left, a 20px "punch hole" slot on the right) */}
                   <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-bone/15 bg-bone/[0.03]">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-volt font-black">{card.number}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-xs text-volt font-black shrink-0">{card.number}</span>
                       <h4
                         ref={(el) => {
                           backHeadingRefs.current[card.id] = el
                         }}
                         tabIndex={-1}
-                        className="font-display font-black text-sm uppercase tracking-tight text-bone focus:outline-none"
+                        className="font-display font-black text-xs sm:text-sm uppercase tracking-tight text-bone focus:outline-none truncate"
                       >
                         {card.title}
                       </h4>
+                      {card.countBadge && (
+                        <span className="font-mono text-[10px] text-bone/50 border border-bone/20 px-1.5 py-0.5 shrink-0">
+                          {card.countBadge}
+                        </span>
+                      )}
                     </div>
 
-                    {/* Dedicated Chamfered "BACK" Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        flipCardToFront(card.id)
-                      }}
-                      aria-label={`Flip ${card.title} card back to front`}
-                      className="clip-chamfer px-3 py-1 bg-volt text-ink hover:bg-bone font-mono text-xs uppercase font-black tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt flex items-center gap-1.5 cursor-pointer shadow-sm"
-                    >
-                      <span className="text-[10px]">⤾</span>
-                      <span>BACK</span>
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          flipCardToFront(card.id)
+                        }}
+                        aria-label={`Flip ${card.title} card back to front`}
+                        className="clip-chamfer px-2.5 py-0.5 bg-volt text-ink hover:bg-bone font-mono text-[10px] uppercase font-black tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt flex items-center gap-1 cursor-pointer shadow-sm"
+                      >
+                        <span className="text-[9px]">⤾</span>
+                        <span>BACK</span>
+                      </button>
+
+                      {/* 20px punch hole slot */}
+                      <div
+                        className="punch-hole-slot relative w-5 h-5 flex items-center justify-center shrink-0"
+                        aria-label="Ticket punch slot"
+                      >
+                        <div
+                          data-punch-slot={card.id}
+                          className={`w-5 h-5 rounded-full border-2 border-volt transition-opacity ${
+                            punchedCards.has(card.id) ? 'opacity-100' : 'opacity-0'
+                          }`}
+                          style={{ transformOrigin: 'center center' }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Back Content Preview (No scrolling inside card) */}
-                  <div className="flex-1 min-h-0 overflow-hidden">
+                  {/* ROW 2: BODY (scrollable if needed) */}
+                  <div className="flex-1 min-h-0 overflow-y-auto p-4 select-none">
                     {renderBackPreview(card.id)}
                   </div>
 
-                  {/* Mono "PUNCHED" stamp corner stamp */}
-                  <div
-                    aria-hidden="true"
-                    className={`punched-stamp pointer-events-none absolute bottom-3 right-3 border border-volt text-volt font-mono text-[10px] uppercase font-black px-2 py-0.5 tracking-widest z-20 ${
-                      punchedCardsRef.current.has(card.id) ? 'opacity-90' : 'opacity-0'
-                    }`}
-                    style={{ transform: 'rotate(-6deg)' }}
-                  >
-                    PUNCHED
+                  {/* ROW 3: FOOTER ROW (Open full button, always its own row, never overlapped) */}
+                  <div className="shrink-0 px-4 py-2 border-t border-bone/15 bg-bone/[0.02] flex items-center justify-between font-mono text-xs">
+                    <span className="text-bone/50 text-[10px] truncate">
+                      {card.countBadge || 'Full details'}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Open full ${card.title} panel`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpenFull(card.id, e.currentTarget as HTMLElement)
+                      }}
+                      className="text-volt uppercase font-black hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      <span>Open full</span>
+                      <span aria-hidden="true">→</span>
+                    </button>
                   </div>
                 </div>
               </div>

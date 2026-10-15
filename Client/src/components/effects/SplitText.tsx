@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { motion } from 'motion/react'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { usePageRevealed, logAnimationStart } from '@/lib/pageReady'
 
 interface SplitTextProps {
   text: string
@@ -24,13 +26,20 @@ export function SplitText({
 }: SplitTextProps) {
   const prefersReduced = usePrefersReducedMotion()
   const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
+  const isRevealed = usePageRevealed()
   const Tag = tag
+
+  useEffect(() => {
+    if (isHeroTitle && isRevealed) {
+      logAnimationStart('Landing Hero Title')
+    }
+  }, [isHeroTitle, isRevealed])
 
   if (prefersReduced || isLite) {
     return <Tag className={className}>{text}</Tag>
   }
 
-  // PART 8.1: Hero title CSS keyframe animation starting on first painted frame (LCP safe, not opacity 0)
+  // PART 2 & PART 8.1: Hero title starts in transform-only pose and animates when revealed
   if (isHeroTitle) {
     const words = text.split(' ')
     let globalCharIndex = 0
@@ -44,7 +53,7 @@ export function SplitText({
               return (
                 <span key={charIdx} className="inline-block overflow-hidden">
                   <span
-                    className={`hero-title-char ${charClassName}`}
+                    className={`hero-title-char ${isRevealed ? 'hero-title-char-animate' : 'hero-title-char-pending'} ${charClassName}`}
                     style={
                       {
                         '--char-index': charIndex,

@@ -57,6 +57,8 @@ export function GalleryPane({ galleryImages = [] }: GalleryPaneProps) {
                   alt={`Pass gallery preview ${idx + 1}`}
                   loading="lazy"
                   decoding="async"
+                  width={320}
+                  height={180}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
                 <span className="absolute bottom-2 right-2 bg-ink/80 text-volt font-mono text-[9px] px-1.5 py-0.5 border border-volt/40 uppercase">
@@ -90,6 +92,10 @@ export function GalleryPane({ galleryImages = [] }: GalleryPaneProps) {
               <img
                 src={selectedImage}
                 alt="Enlarged view"
+                loading="lazy"
+                decoding="async"
+                width={1200}
+                height={800}
                 className="w-full h-full object-contain max-h-[75vh]"
               />
 

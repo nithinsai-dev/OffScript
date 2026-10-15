@@ -17,6 +17,7 @@ import { useEventsQuery } from '@/features/events/queries'
 import { useLenis, easeOutExpo } from '@/hooks/useLenis'
 import { MOTION } from '@/lib/motion'
 import { handleRouteChangeReveals } from '@/lib/reveal'
+import { whenRevealed, logAnimationStart } from '@/lib/pageReady'
 
 const LazyLineupSection = lazy(() =>
   import('@/components/events/LineupSection').then((m) => ({ default: m.LineupSection }))
@@ -217,11 +218,11 @@ export function LandingPage() {
         })
     }
 
-    if (document.readyState === 'complete') {
+    whenRevealed().then(() => {
+      if (isCleanedUp) return
+      logAnimationStart('Landing Hero GSAP Timeline')
       runHeroTimeline()
-    } else {
-      window.addEventListener('load', runHeroTimeline, { once: true })
-    }
+    })
 
     return () => {
       isCleanedUp = true
