@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useRouterState, useNavigate } from '@tanstack/react-router'
+import { Link, useRouterState, useNavigate, useRouter } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { Button } from '@/components/ui/Button'
 import { REGISTRATION_URL_BASE } from '@/lib/config'
@@ -10,7 +10,7 @@ import { useTextScramble } from '@/hooks/useTextScramble'
 const NAV_LINKS = [
   { label: 'Featured', id: 'featured' },
   { label: 'Countdown', id: 'countdown' },
-  { label: 'Events', id: 'events' },
+  { label: 'Events', id: 'events', isRoute: true },
   { label: 'Sponsors', id: 'sponsors' },
   { label: 'Lineup', id: 'lineup' },
 ]
@@ -18,13 +18,17 @@ const NAV_LINKS = [
 function NavLinkItem({
   label,
   id,
+  isRoute,
   isActive,
   onClick,
+  onPrefetch,
 }: {
   label: string
   id: string
+  isRoute?: boolean
   isActive: boolean
   onClick: (id: string) => void
+  onPrefetch?: () => void
 }) {
   const { displayText, scramble, reset } = useTextScramble(label)
 
@@ -32,7 +36,13 @@ function NavLinkItem({
     <button
       type="button"
       onClick={() => onClick(id)}
-      onMouseEnter={() => scramble(280)}
+      onMouseEnter={() => {
+        scramble(280)
+        if (isRoute) onPrefetch?.()
+      }}
+      onFocus={() => {
+        if (isRoute) onPrefetch?.()
+      }}
       onMouseLeave={reset}
       className={`relative px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt ${
         isActive ? 'text-ink font-black' : 'text-bone/70 hover:text-bone'
@@ -61,12 +71,19 @@ export function Navbar() {
   const { scrollTo, getLenis } = useLenis()
   const routerState = useRouterState()
   const navigate = useNavigate()
+  const router = useRouter()
+
   const isLandingPage = routerState.location.pathname === '/'
+  const isEventsPage = routerState.location.pathname === '/events'
 
   const isLockedRef = useRef(false)
   const lockTimerRef = useRef<number | null>(null)
 
-  // Active section detection via scroll position (40% viewport height trigger line)
+  const handlePrefetchEvents = () => {
+    router.preloadRoute({ to: '/events' })
+  }
+
+  // Active section detection via scroll position (Landing page only, IGNORES Events link)
   useEffect(() => {
     if (!isLandingPage) return
 
@@ -76,7 +93,8 @@ export function Navbar() {
       if (isLockedRef.current) return
 
       const triggerLine = window.innerHeight * 0.4
-      const sectionIds = NAV_LINKS.map((link) => link.id)
+      // Ignore Events in active-section detection on landing page as required
+      const sectionIds = NAV_LINKS.filter((l) => l.id !== 'events').map((link) => link.id)
 
       let currentActive = ''
 
@@ -84,7 +102,6 @@ export function Navbar() {
         const el = document.getElementById(id)
         if (!el) continue
         const rect = el.getBoundingClientRect()
-        // If the 40% viewport line is inside the section
         if (rect.top <= triggerLine && rect.bottom > triggerLine) {
           currentActive = id
           break
@@ -135,6 +152,12 @@ export function Navbar() {
 
   const handleLinkClick = (id: string) => {
     setMobileMenuOpen(false)
+
+    if (id === 'events') {
+      navigate({ to: '/events' })
+      return
+    }
+
     setActiveSection(id)
 
     // Lock detection until the Lenis scrollTo finishes
@@ -155,6 +178,7 @@ export function Navbar() {
         onComplete: unlock,
       })
     } else {
+      // When navigating from /events or elsewhere, navigate to "/" and scroll after route settles
       navigate({ to: '/', hash: id })
     }
   }
@@ -172,14 +196,15 @@ export function Navbar() {
         Skip to main content
       </a>
 
-      {/* Floating Centered Chamfered Bar Navbar (NOT a pill) */}
+      {/* Floating Centered Chamfered Bar Navbar (Solid Ink background to avoid clash) */}
       <header
         role="banner"
         className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-[900px] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           shouldHide ? '-translate-y-28 opacity-0' : 'translate-y-0 opacity-100'
         }`}
       >
-        <div className="relative glass-panel clip-chamfer border-2 border-bone/20 px-3 py-2 sm:px-5 sm:py-2.5 shadow-2xl">
+        {/* Solid Ink background (~90% opacity) so page content never shows through and clashes */}
+        <div className="relative bg-[#111210]/92 backdrop-blur-md clip-chamfer border-2 border-bone/20 px-3 py-2 sm:px-5 sm:py-2.5 shadow-2xl">
           <nav
             aria-label="Main Navigation"
             className="flex items-center justify-between gap-2 sm:gap-4"
@@ -197,15 +222,23 @@ export function Navbar() {
 
             {/* Centered Links with Animated Active Indicator (Desktop) */}
             <div className="hidden md:flex items-center gap-1 relative bg-bone/[0.04] p-1 border border-bone/15">
-              {NAV_LINKS.map((link) => (
-                <NavLinkItem
-                  key={link.id}
-                  label={link.label}
-                  id={link.id}
-                  isActive={activeSection === link.id && isLandingPage}
-                  onClick={handleLinkClick}
-                />
-              ))}
+              {NAV_LINKS.map((link) => {
+                const isActive = isEventsPage
+                  ? link.id === 'events'
+                  : isLandingPage && activeSection === link.id && link.id !== 'events'
+
+                return (
+                  <NavLinkItem
+                    key={link.id}
+                    label={link.label}
+                    id={link.id}
+                    isRoute={link.isRoute}
+                    isActive={isActive}
+                    onClick={handleLinkClick}
+                    onPrefetch={handlePrefetchEvents}
+                  />
+                )
+              })}
             </div>
 
             {/* Right Side: Chamfered Register Button + Mobile Toggle */}
@@ -304,7 +337,7 @@ export function Navbar() {
                 Register For Fest
               </Button>
               <div className="text-center font-mono text-[11px] text-bone/40">
-                #beoffscript // FEST PASS
+                #beoffscript
               </div>
             </div>
           </motion.div>

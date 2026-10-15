@@ -24,3 +24,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Benchmark & Audit Reports / Traces
+scratch/
+**/scratch/
+scratch-lh*.json
+*-event-detail*.json
+*-events*.json
+after-*.json
+baseline-*.json
+*.trace.json
+*.devtoolslog.json

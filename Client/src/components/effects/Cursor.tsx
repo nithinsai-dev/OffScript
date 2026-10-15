@@ -3,23 +3,12 @@ import { motion, AnimatePresence } from 'motion/react'
 import gsap from 'gsap'
 import { useCursor } from '@/hooks/useCursor'
 import { useIsFinePointer, usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { type CursorShard, createCursorShards } from '@/lib/shards'
 
 interface TrailPoint {
   x: number
   y: number
   time: number
-}
-
-interface Shard {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  size: number
-  rotation: number
-  vRot: number
-  born: number
-  duration: number
 }
 
 export function Cursor() {
@@ -33,7 +22,7 @@ export function Cursor() {
 
   // Trail and shards stored in refs for zero React re-render overhead
   const trailRef = useRef<TrailPoint[]>([])
-  const shardsRef = useRef<Shard[]>([])
+  const shardsRef = useRef<CursorShard[]>([])
   const rafIdRef = useRef<number | null>(null)
   const isLoopRunningRef = useRef(false)
   const lastFrameTimeRef = useRef(0)
@@ -176,25 +165,7 @@ export function Cursor() {
 
     const handleClick = (e: MouseEvent) => {
       // Spawn 8 Volt shards flying radially on click
-      const now = performance.now()
-      const newShards: Shard[] = []
-      const shardCount = 8
-
-      for (let i = 0; i < shardCount; i++) {
-        const angle = (i / shardCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4
-        const speed = 2.0 + Math.random() * 3.5
-        newShards.push({
-          x: e.clientX,
-          y: e.clientY,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          size: 2.5 + Math.random() * 3,
-          rotation: Math.random() * 360,
-          vRot: (Math.random() - 0.5) * 10,
-          born: now,
-          duration: 450,
-        })
-      }
+      const newShards = createCursorShards(e.clientX, e.clientY, 8)
       shardsRef.current.push(...newShards)
       ensureLoop()
     }

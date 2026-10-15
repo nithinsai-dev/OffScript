@@ -6,10 +6,12 @@ interface TicketShapeProps {
   id?: string
   children: ReactNode
   stubContent?: ReactNode
+  overlayContent?: ReactNode
   className?: string
   stubWidth?: number // desktop stub width (default 130px)
   isHovered?: boolean
   tearOnHover?: boolean // ONLY true for Featured stacking cards
+  hoverStroke?: boolean // default true, false disables hover border color change
   onMouseEnter?: () => void
   onMouseLeave?: () => void
 }
@@ -138,10 +140,12 @@ export function TicketShape({
   id = 'pass-01',
   children,
   stubContent,
+  overlayContent,
   className = '',
   stubWidth = 130,
   isHovered: externalHover,
   tearOnHover = false,
+  hoverStroke = true,
   onMouseEnter,
   onMouseLeave,
 }: TicketShapeProps) {
@@ -226,9 +230,9 @@ export function TicketShape({
         <path
           d={ticketPath}
           fill="#111210"
-          stroke={isHovered ? '#D4FF3F' : '#EDEBE0'}
+          stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
           strokeWidth="2"
-          strokeOpacity={isHovered ? 0.9 : 0.22}
+          strokeOpacity={hoverStroke && isHovered ? 0.9 : 0.22}
           className="transition-colors duration-200"
         />
 
@@ -239,7 +243,7 @@ export function TicketShape({
             y1={P}
             x2={W - 12}
             y2={P}
-            stroke={isHovered ? '#D4FF3F' : '#EDEBE0'}
+            stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
             strokeWidth="2"
             strokeDasharray="1 6"
             strokeLinecap="round"
@@ -251,7 +255,7 @@ export function TicketShape({
             y1="12"
             x2={P}
             y2={H - 12}
-            stroke={isHovered ? '#D4FF3F' : '#EDEBE0'}
+            stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
             strokeWidth="2"
             strokeDasharray="1 6"
             strokeLinecap="round"
@@ -265,6 +269,8 @@ export function TicketShape({
         className="relative z-10 w-full h-full flex flex-col sm:flex-row overflow-hidden"
         style={{ clipPath: `url(#${clipId})` }}
       >
+        {overlayContent}
+
         {/* Main Body */}
         <div className="flex-1 flex flex-col min-w-0 p-4 sm:p-5 relative z-10">
           {children}

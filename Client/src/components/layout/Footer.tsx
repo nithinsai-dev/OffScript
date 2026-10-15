@@ -1,15 +1,23 @@
+import { Link, useRouterState, useNavigate } from '@tanstack/react-router'
 import { useLenis, easeOutExpo } from '@/hooks/useLenis'
 import { BRAND, REGISTRATION_URL_BASE } from '@/lib/config'
 
 export function Footer() {
   const { scrollTo } = useLenis()
+  const routerState = useRouterState()
+  const navigate = useNavigate()
+  const isLandingPage = routerState.location.pathname === '/'
 
-  const handleNav = (target: string) => {
-    scrollTo(target, {
-      offset: -96,
-      duration: 0.9,
-      easing: easeOutExpo,
-    })
+  const handleSectionNav = (id: string) => {
+    if (isLandingPage) {
+      scrollTo(`#${id}`, {
+        offset: -96,
+        duration: 0.9,
+        easing: easeOutExpo,
+      })
+    } else {
+      navigate({ to: '/', hash: id })
+    }
   }
 
   return (
@@ -38,25 +46,24 @@ export function Footer() {
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNav('#featured')}
+                  onClick={() => handleSectionNav('featured')}
                   className="text-bone/80 hover:text-volt transition-colors uppercase"
                 >
                   Featured Passes
                 </button>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => handleNav('#events')}
-                  className="text-bone/80 hover:text-volt transition-colors uppercase"
+                <Link
+                  to="/events"
+                  className="text-bone/80 hover:text-volt transition-colors uppercase block"
                 >
                   All Events
-                </button>
+                </Link>
               </li>
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNav('#countdown')}
+                  onClick={() => handleSectionNav('countdown')}
                   className="text-bone/80 hover:text-volt transition-colors uppercase"
                 >
                   Countdown
@@ -65,7 +72,7 @@ export function Footer() {
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNav('#lineup')}
+                  onClick={() => handleSectionNav('lineup')}
                   className="text-bone/80 hover:text-volt transition-colors uppercase"
                 >
                   Event Lineup
@@ -74,7 +81,7 @@ export function Footer() {
               <li>
                 <button
                   type="button"
-                  onClick={() => handleNav('#sponsors')}
+                  onClick={() => handleSectionNav('sponsors')}
                   className="text-bone/80 hover:text-volt transition-colors uppercase"
                 >
                   Partners

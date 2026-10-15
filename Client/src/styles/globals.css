@@ -12,7 +12,7 @@
   --color-volt: #D4FF3F;
 
   --font-display: "Bricolage Grotesque", "Bricolage Grotesque Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-mono: "JetBrains Mono", "JetBrains Mono Fallback", monospace;
   --font-sans: "Bricolage Grotesque", "Bricolage Grotesque Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   --shadow-hard-bone: 4px 4px 0px #EDEBE0;
@@ -375,3 +375,509 @@ html[data-perf="lite"] * {
     scroll-behavior: auto !important;
   }
 }
+
+/* =========================================================================
+   PART 1: /events CARD 3D TILT & CONTINUOUS BARCODE SCANNER LINE
+   ========================================================================= */
+
+.event-card-perspective-wrapper {
+  perspective: 900px;
+}
+
+.event-card-tilt-layer {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Continuous Barcode Scanner Line (B): Slower 2.8s sweep, linear in middle, eased ends */
+.card-continuous-scanner-wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 25;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.card-continuous-scanner-runner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  pointer-events: none;
+  transform: translateY(-10%);
+  animation: continuousScannerSweep calc(2.8s * var(--motion-scale, 1)) linear infinite;
+  animation-play-state: paused;
+}
+
+/* 28px soft Volt trail above + 2px solid Volt line at bottom */
+.card-continuous-scanner-runner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, rgba(212, 255, 63, 0.25));
+}
+
+.card-continuous-scanner-runner::after {
+  content: '';
+  position: absolute;
+  top: 28px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #D4FF3F;
+}
+
+@keyframes continuousScannerSweep {
+  0% {
+    transform: translateY(-10%);
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+  12% {
+    animation-timing-function: linear;
+  }
+  88% {
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+  100% {
+    transform: translateY(110%);
+  }
+}
+
+/* 6 tiny Volt flakes that ride the scan line (Part 3) */
+.scanner-flake {
+  position: absolute;
+  background-color: #D4FF3F;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-out;
+  animation-play-state: paused;
+}
+
+@keyframes flakeDrift1 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  20% { opacity: 0.8; }
+  80% { opacity: 0.6; }
+  100% { transform: translate(-8px, -18px); opacity: 0; }
+}
+@keyframes flakeDrift2 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  25% { opacity: 0.75; }
+  75% { opacity: 0.5; }
+  100% { transform: translate(12px, -22px); opacity: 0; }
+}
+@keyframes flakeDrift3 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  20% { opacity: 0.7; }
+  80% { opacity: 0.4; }
+  100% { transform: translate(-14px, -14px); opacity: 0; }
+}
+@keyframes flakeDrift4 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  30% { opacity: 0.8; }
+  70% { opacity: 0.45; }
+  100% { transform: translate(6px, -26px); opacity: 0; }
+}
+@keyframes flakeDrift5 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  20% { opacity: 0.75; }
+  80% { opacity: 0.5; }
+  100% { transform: translate(-10px, -20px); opacity: 0; }
+}
+@keyframes flakeDrift6 {
+  0% { transform: translate(0, 0); opacity: 0; }
+  25% { opacity: 0.8; }
+  75% { opacity: 0.4; }
+  100% { transform: translate(14px, -16px); opacity: 0; }
+}
+
+.scanner-flake-1 { width: 4px; height: 4px; left: 15%; top: 26px; animation-name: flakeDrift1; animation-duration: calc(1.0s * var(--motion-scale, 1)); animation-delay: 0.1s; }
+.scanner-flake-2 { width: 3px; height: 3px; border-radius: 9999px; left: 32%; top: 27px; animation-name: flakeDrift2; animation-duration: calc(1.3s * var(--motion-scale, 1)); animation-delay: 0.3s; }
+.scanner-flake-3 { width: 5px; height: 5px; left: 48%; top: 25px; animation-name: flakeDrift3; animation-duration: calc(0.9s * var(--motion-scale, 1)); animation-delay: 0.05s; }
+.scanner-flake-4 { width: 3px; height: 3px; border-radius: 9999px; left: 66%; top: 26px; animation-name: flakeDrift4; animation-duration: calc(1.4s * var(--motion-scale, 1)); animation-delay: 0.4s; }
+.scanner-flake-5 { width: 4px; height: 4px; left: 80%; top: 27px; animation-name: flakeDrift5; animation-duration: calc(1.1s * var(--motion-scale, 1)); animation-delay: 0.2s; }
+.scanner-flake-6 { width: 4px; height: 4px; border-radius: 9999px; left: 92%; top: 25px; animation-name: flakeDrift6; animation-duration: calc(1.2s * var(--motion-scale, 1)); animation-delay: 0.35s; }
+
+/* Desktop hover & keyboard focus-visible trigger continuous scan & flakes */
+@media (hover: hover) and (pointer: fine) {
+  html:not([data-perf="lite"]) .group:hover .card-continuous-scanner-wrap,
+  html:not([data-perf="lite"]) .group:focus-within .card-continuous-scanner-wrap {
+    opacity: 1;
+  }
+
+  html:not([data-perf="lite"]) .group:hover .card-continuous-scanner-runner,
+  html:not([data-perf="lite"]) .group:focus-within .card-continuous-scanner-runner {
+    animation-play-state: running;
+  }
+
+  html:not([data-perf="lite"]) .group:hover .scanner-flake,
+  html:not([data-perf="lite"]) .group:focus-within .scanner-flake {
+    animation-play-state: running;
+  }
+}
+
+/* Focus-visible triggers scan line only (no tilt) */
+.event-card-perspective-wrapper:focus-within .card-continuous-scanner-wrap,
+.event-card-perspective-wrapper:focus-visible .card-continuous-scanner-wrap {
+  opacity: 1;
+}
+
+.event-card-perspective-wrapper:focus-within .card-continuous-scanner-runner,
+.event-card-perspective-wrapper:focus-visible .card-continuous-scanner-runner {
+  animation-play-state: running;
+}
+
+.event-card-perspective-wrapper:focus-within .scanner-flake,
+.event-card-perspective-wrapper:focus-visible .scanner-flake {
+  animation-play-state: running;
+}
+
+/* Touch, lite mode and reduced motion: scanner & flakes disabled */
+html[data-perf="lite"] .card-continuous-scanner-wrap,
+html[data-perf="lite"] .card-continuous-scanner-runner,
+html[data-perf="lite"] .scanner-flake {
+  display: none !important;
+  animation: none !important;
+}
+
+@media (pointer: coarse) {
+  .card-continuous-scanner-wrap,
+  .card-continuous-scanner-runner,
+  .scanner-flake {
+    display: none !important;
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-continuous-scanner-wrap,
+  .card-continuous-scanner-runner,
+  .scanner-flake {
+    display: none !important;
+    animation: none !important;
+  }
+}
+
+/* =========================================================================
+   PART 2: EVENT DETAIL FLIP CARDS & SHINY HOVER SHEEN (1.4s sweep)
+   ========================================================================= */
+
+.flip-grid-wrapper {
+  perspective: 1200px;
+}
+
+/* Front Face 2px Lift on Desktop Hover with 300ms transition */
+@media (hover: hover) and (pointer: fine) {
+  html:not([data-perf="lite"]) .flip-card-front {
+    transition: transform calc(300ms * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1), border-color 200ms ease;
+  }
+  html:not([data-perf="lite"]) .flip-card-front:hover {
+    transform: translateY(-2px);
+    border-color: rgba(237, 235, 224, 0.45);
+  }
+}
+
+/* Shiny Hover Sheen: Diagonal pseudo-element band */
+.card-shiny-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 15;
+}
+
+.card-shiny-sheen::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(237, 235, 224, 0.18) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes shinySheenSweep {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+/* Desktop fine pointer: sweep once per hover, 1.4s ease-in-out */
+@media (hover: hover) and (pointer: fine) {
+  html:not([data-perf="lite"]) .flip-card-front:hover .card-shiny-sheen::after {
+    animation: shinySheenSweep calc(1.4s * var(--motion-scale, 1)) ease-in-out forwards;
+  }
+}
+
+/* Touch, lite mode and reduced motion: Sheen completely disabled */
+html[data-perf="lite"] .card-shiny-sheen,
+html[data-perf="lite"] .card-shiny-sheen::after {
+  display: none !important;
+  animation: none !important;
+}
+
+@media (pointer: coarse) {
+  .card-shiny-sheen,
+  .card-shiny-sheen::after {
+    display: none !important;
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-shiny-sheen,
+  .card-shiny-sheen::after {
+    animation: none !important;
+    display: none !important;
+  }
+  .flip-card-front:hover {
+    transform: none !important;
+  }
+}
+
+/* Cards pending entry sequence (Full drop-shatter mode) */
+[data-enter="pending"] .flip-card-item {
+  opacity: 0 !important;
+  transform: scale(0.6) !important;
+  pointer-events: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-enter="pending"] .flip-card-item {
+    opacity: 0 !important;
+    transform: none !important;
+  }
+}
+
+/* =========================================================================
+   PART 7: UNIVERSAL SCROLL REVEAL SYSTEM (CSS INITIAL STATES AT FIRST RENDER)
+   ========================================================================= */
+
+/* Elements below the fold with data-reveal start hidden immediately at first render in CSS */
+/* Exclude first viewport / hero elements */
+[data-reveal]:not([data-in-hero]):not(.is-revealed) {
+  pointer-events: none;
+}
+
+/* Technique 1: Heading - masked lines rising (0.8s) */
+[data-reveal="heading"]:not([data-in-hero]):not(.is-revealed) {
+  transform: translateY(100%);
+  opacity: 0;
+}
+[data-reveal="heading"] {
+  transition: transform calc(0.8s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1),
+              opacity calc(0.5s * var(--motion-scale, 1)) ease-out;
+  will-change: transform, opacity;
+}
+[data-reveal="heading"].is-revealed {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Technique 2: Paragraph - 28px rise with opacity (0.7s) */
+[data-reveal="paragraph"]:not([data-in-hero]):not(.is-revealed) {
+  transform: translateY(28px);
+  opacity: 0;
+}
+[data-reveal="paragraph"] {
+  transition: transform calc(0.7s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1),
+              opacity calc(0.7s * var(--motion-scale, 1)) ease-out;
+  will-change: transform, opacity;
+}
+[data-reveal="paragraph"].is-revealed {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Technique 3: Image & Banner - clip-path wipe (1.0s) */
+[data-reveal="image"]:not([data-in-hero]):not(.is-revealed),
+[data-reveal="banner"]:not([data-in-hero]):not(.is-revealed) {
+  clip-path: polygon(0 100%, 100% 100%, 100% 100%, 0 100%);
+  opacity: 0;
+}
+[data-reveal="image"],
+[data-reveal="banner"] {
+  transition: clip-path calc(1.0s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1),
+              opacity calc(0.6s * var(--motion-scale, 1)) ease-out;
+  will-change: clip-path, opacity;
+}
+[data-reveal="image"].is-revealed,
+[data-reveal="banner"].is-revealed {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Technique 4: Card - rise with slight rotation settling to 0 (0.8s, staggered) */
+[data-reveal="card"]:not([data-in-hero]):not(.is-revealed) {
+  transform: translateY(36px) rotate(var(--reveal-rot, 1.5deg));
+  opacity: 0;
+}
+[data-reveal="card"] {
+  transition: transform calc(0.8s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1),
+              opacity calc(0.6s * var(--motion-scale, 1)) ease-out;
+  transition-delay: calc(var(--reveal-index, 0) * 0.08s * var(--motion-scale, 1));
+  will-change: transform, opacity;
+}
+[data-reveal="card"].is-revealed {
+  transform: translateY(0) rotate(0deg);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Technique 5: Stat - numerical increment trigger & 20px rise (1.6s) */
+[data-reveal="stat"]:not([data-in-hero]):not(.is-revealed) {
+  transform: translateY(20px);
+  opacity: 0;
+}
+[data-reveal="stat"] {
+  transition: transform calc(0.8s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1),
+              opacity calc(0.8s * var(--motion-scale, 1)) ease-out;
+  will-change: transform, opacity;
+}
+[data-reveal="stat"].is-revealed {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Technique 6: Stamp - stamp in with overshoot (0.6s) */
+[data-reveal="stamp"]:not([data-in-hero]):not(.is-revealed) {
+  transform: scale(1.35) rotate(-8deg);
+  opacity: 0;
+}
+[data-reveal="stamp"] {
+  transition: transform calc(0.6s * var(--motion-scale, 1)) cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity calc(0.3s * var(--motion-scale, 1)) ease-out;
+  will-change: transform, opacity;
+}
+[data-reveal="stamp"].is-revealed {
+  transform: scale(1) rotate(var(--stamp-rot, -2deg));
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Technique 7: Rail & Row - slide in from the side (0.8s) */
+[data-reveal="rail"]:not([data-in-hero]):not(.is-revealed) {
+  transform: translateX(40px);
+  opacity: 0;
+}
+[data-reveal="rail"] {
+  transition: transform calc(0.8s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1),
+              opacity calc(0.6s * var(--motion-scale, 1)) ease-out;
+  will-change: transform, opacity;
+}
+[data-reveal="rail"].is-revealed {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Technique 8: Section Divider - draw in scaleX (0.8s) */
+[data-reveal="divider"]:not([data-in-hero]):not(.is-revealed) {
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0.3;
+}
+[data-reveal="divider"] {
+  transition: transform calc(0.8s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1),
+              opacity calc(0.4s * var(--motion-scale, 1)) ease-out;
+  will-change: transform;
+}
+[data-reveal="divider"].is-revealed {
+  transform: scaleX(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Lite mode & reduced motion: CSS-only IntersectionObserver fade with 16px translate */
+html[data-perf="lite"] [data-reveal]:not([data-in-hero]):not(.is-revealed) {
+  clip-path: none !important;
+  transform: translateY(16px) !important;
+  opacity: 0 !important;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out !important;
+  will-change: auto !important;
+}
+
+html[data-perf="lite"] [data-reveal].is-revealed {
+  transform: translateY(0) !important;
+  opacity: 1 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal]:not([data-in-hero]):not(.is-revealed) {
+    clip-path: none !important;
+    transform: translateY(16px) !important;
+    opacity: 0 !important;
+    transition: opacity 0.4s ease-out, transform 0.4s ease-out !important;
+    will-change: auto !important;
+  }
+  [data-reveal].is-revealed {
+    transform: translateY(0) !important;
+    opacity: 1 !important;
+  }
+}
+
+/* =========================================================================
+   PART 8: HERO TITLE MASKED RISE KEYFRAME ANIMATION (1.3s total)
+   Painted from first frame (partially masked), opacity 1 throughout (LCP safe)
+   ========================================================================= */
+
+@keyframes heroTitleCharRise {
+  0% {
+    transform: translateY(105%);
+  }
+  100% {
+    transform: translateY(0%);
+  }
+}
+
+.hero-title-char {
+  display: inline-block;
+  will-change: transform;
+  animation: heroTitleCharRise calc(1.3s * var(--motion-scale, 1)) cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--char-index, 0) * 0.045s * var(--motion-scale, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-title-char {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+html[data-perf="lite"] .hero-title-char {
+  animation: none !important;
+  transform: none !important;
+}
+
+

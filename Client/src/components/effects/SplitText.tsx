@@ -9,6 +9,7 @@ interface SplitTextProps {
   delay?: number
   stagger?: number
   by?: 'chars' | 'words'
+  isHeroTitle?: boolean
 }
 
 export function SplitText({
@@ -19,6 +20,7 @@ export function SplitText({
   delay = 0,
   stagger = 0.025,
   by = 'chars',
+  isHeroTitle = false,
 }: SplitTextProps) {
   const prefersReduced = usePrefersReducedMotion()
   const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
@@ -26,6 +28,38 @@ export function SplitText({
 
   if (prefersReduced || isLite) {
     return <Tag className={className}>{text}</Tag>
+  }
+
+  // PART 8.1: Hero title CSS keyframe animation starting on first painted frame (LCP safe, not opacity 0)
+  if (isHeroTitle) {
+    const words = text.split(' ')
+    let globalCharIndex = 0
+
+    return (
+      <Tag className={`inline-flex flex-wrap ${className}`}>
+        {words.map((word, wordIdx) => (
+          <span key={wordIdx} className="inline-flex whitespace-nowrap mr-[0.28em] last:mr-0">
+            {Array.from(word).map((char, charIdx) => {
+              const charIndex = globalCharIndex++
+              return (
+                <span key={charIdx} className="inline-block overflow-hidden">
+                  <span
+                    className={`hero-title-char ${charClassName}`}
+                    style={
+                      {
+                        '--char-index': charIndex,
+                      } as React.CSSProperties
+                    }
+                  >
+                    {char}
+                  </span>
+                </span>
+              )
+            })}
+          </span>
+        ))}
+      </Tag>
+    )
   }
 
   if (by === 'words') {
@@ -53,7 +87,7 @@ export function SplitText({
     )
   }
 
-  // Split by characters (desktop full mode only)
+  // Split by characters (motion fallback)
   const words = text.split(' ')
 
   return (

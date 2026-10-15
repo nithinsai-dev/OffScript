@@ -52,7 +52,7 @@ export function EventRail({
   if (events.length === 0) return null
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div data-reveal="rail" className={`space-y-6 ${className}`}>
       {/* Header with Title and Prev/Next Navigation Controls */}
       {(title || subtitle) && (
         <div className="flex items-end justify-between gap-4">
