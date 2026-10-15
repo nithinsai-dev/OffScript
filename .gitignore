@@ -1,3 +1,8 @@
+node_modules/
+dist/
+.env
+.env.*.local
+
 # Logs
 logs
 *.log
@@ -147,3 +152,14 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Benchmark & Audit Reports / Traces
+scratch/
+**/scratch/
+**/*-event-detail*.json
+**/*-events*.json
+**/after-*.json
+**/baseline-*.json
+**/scratch-lh*.json
+*.trace.json
+*.devtoolslog.json
