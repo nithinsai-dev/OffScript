@@ -349,20 +349,36 @@ export function EventDetailPage() {
     </motion.div>
   )
 
-  // STICKY INFO TICKET PANEL (Static Ticket silhouette, no tear)
+  // STICKY INFO TICKET PANEL (Static Ticket silhouette, no tear, full-height stretch, no overlap)
   const infoTicketStub = (
-    <div className="h-full flex flex-col justify-between items-center py-2 font-mono select-none w-full">
-      <span className="font-mono text-[10px] uppercase tracking-widest text-volt font-black -rotate-90 py-4">
-        ADMIT ONE
-      </span>
-      <div className="space-y-1 text-center">
-        <span className="font-mono text-[8px] text-bone/40 uppercase block">SERIAL</span>
-        <span className="font-mono text-[10px] text-volt font-black tracking-wider">
+    <div className="h-full w-full flex flex-row sm:flex-col justify-between items-center py-3 px-4 sm:px-0 font-mono select-none relative self-stretch">
+      {/* 1. TOP: Serial label + serial value */}
+      <div className="space-y-0.5 text-left sm:text-center shrink-0">
+        <span className="font-mono text-[8px] text-bone/40 uppercase tracking-wider block">SERIAL</span>
+        <span className="font-mono text-[10px] text-volt font-black tracking-wider block truncate max-w-[95px]">
           #{(event.id || 'PASS').substring(0, 8).toUpperCase()}
         </span>
       </div>
-      <div className="pt-2">
-        <TicketBarcode id={event.id} className="w-16" />
+
+      {/* 2. MIDDLE: Vertical "ADMIT ONE" in its own reserved slot using writing-mode: vertical-rl */}
+      <div className="flex items-center justify-center sm:flex-1 my-0 sm:my-3 min-h-[20px] sm:min-h-[60px]">
+        <span
+          className="font-mono text-[10px] uppercase tracking-widest text-volt font-black select-none hidden sm:inline-block"
+          style={{
+            writingMode: 'vertical-rl',
+            transform: 'rotate(180deg)',
+          }}
+        >
+          ADMIT ONE
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-volt font-black select-none inline-block sm:hidden">
+          ADMIT ONE
+        </span>
+      </div>
+
+      {/* 3. BOTTOM: Barcode */}
+      <div className="shrink-0 w-auto sm:w-full flex justify-center pt-0 sm:pt-2">
+        <TicketBarcode id={event.id} className="w-14 sm:w-16" />
       </div>
     </div>
   )
@@ -501,13 +517,13 @@ export function EventDetailPage() {
         </div>
       </div>
 
-      {/* 2. HERO: FULL-BLEED TICKET BANNER WITH MASKED UNMASK */}
+      {/* 2. HERO: FULL-BLEED TICKET BANNER */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        <motion.div
-          initial={{ clipPath: 'polygon(0 0, 100% 0, 100% 0, 0 0)' }}
-          animate={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)' }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full aspect-[21/9] sm:aspect-[24/9] border-2 border-bone/25 overflow-hidden bg-bone/5 group"
+        <TicketShape
+          id="event-hero-banner"
+          hasPerforation={false}
+          bodyClassName="p-0"
+          className="w-full aspect-[21/9] sm:aspect-[24/9] group"
         >
           <img
             src={heroImageSrc}
@@ -516,6 +532,8 @@ export function EventDetailPage() {
             loading="eager"
             fetchPriority="high"
             decoding="async"
+            width={1200}
+            height={500}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
           />
 
@@ -525,11 +543,7 @@ export function EventDetailPage() {
               {event.category || 'CAMPUS PASS'}
             </Stamp>
           </div>
-
-          {/* Semicircle Notches */}
-          <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-ink border-2 border-bone/25 rounded-full z-10" />
-          <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-ink border-2 border-bone/25 rounded-full z-10" />
-        </motion.div>
+        </TicketShape>
 
         {/* Big Event Name & Info Pills */}
         <div className="space-y-4 pt-2">

@@ -7,7 +7,7 @@ import type { EventDetail } from '@/types/event'
 import { MOTION, MOTION_SCALE } from '@/lib/motion'
 import {
   shouldPlayFullSequence,
-  runCardDropShatterSequence,
+  runMechanicalAssemblySequence,
   runCardQuickSequence,
   runCardFadeSequence,
 } from './cardSequence'
@@ -208,7 +208,8 @@ export function FlipCardBento({
     return list.filter((c) => c.hasData)
   }, [event, isDetailLoading])
 
-  // Start condition: cards data loaded (not skeleton) AND >= 25% in view AND shutter ready
+  // Start condition: cards data loaded (not skeleton) AND in view AND shutter ready
+  // Starts only when: event data loaded, first content painted, and LCP rendered
   useEffect(() => {
     if (hasTriggeredRef.current) return
     if (isDetailLoading || cards.length === 0) return
@@ -216,38 +217,42 @@ export function FlipCardBento({
 
     hasTriggeredRef.current = true
 
-    const timer = setTimeout(() => {
-      const gridEl = gridWrapperRef.current
-      if (!gridEl) {
-        setSequenceDone(true)
-        return
-      }
-
-      const cardEls = Array.from(
-        gridEl.querySelectorAll<HTMLElement>('.flip-card-item')
-      )
-
-      if (cardEls.length === 0) {
-        setSequenceDone(true)
-        return
-      }
-
-      if (prefersReduced) {
-        cancelSequenceRef.current = runCardFadeSequence(gridEl, cardEls, () => {
+    // Double requestAnimationFrame ensures first paint and LCP rendered before starting
+    const r1 = requestAnimationFrame(() => {
+      const r2 = requestAnimationFrame(() => {
+        const gridEl = gridWrapperRef.current
+        if (!gridEl) {
           setSequenceDone(true)
-        })
-      } else if (willRunFull) {
-        cancelSequenceRef.current = runCardDropShatterSequence(gridEl, cardEls, () => {
-          setSequenceDone(true)
-        })
-      } else {
-        cancelSequenceRef.current = runCardQuickSequence(gridEl, cardEls, () => {
-          setSequenceDone(true)
-        })
-      }
-    }, 150)
+          return
+        }
 
-    return () => clearTimeout(timer)
+        const cardEls = Array.from(
+          gridEl.querySelectorAll<HTMLElement>('.flip-card-item')
+        )
+
+        if (cardEls.length === 0) {
+          setSequenceDone(true)
+          return
+        }
+
+        if (prefersReduced) {
+          cancelSequenceRef.current = runCardFadeSequence(gridEl, cardEls, () => {
+            setSequenceDone(true)
+          })
+        } else if (willRunFull) {
+          cancelSequenceRef.current = runMechanicalAssemblySequence(gridEl, cardEls, () => {
+            setSequenceDone(true)
+          })
+        } else {
+          cancelSequenceRef.current = runCardQuickSequence(gridEl, cardEls, () => {
+            setSequenceDone(true)
+          })
+        }
+      })
+      return () => cancelAnimationFrame(r2)
+    })
+
+    return () => cancelAnimationFrame(r1)
   }, [isDetailLoading, cards.length, isInView, isShutterReady, willRunFull, prefersReduced])
 
   // THE SURPRISE: "ticket punch"

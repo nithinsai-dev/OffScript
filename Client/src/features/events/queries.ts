@@ -8,12 +8,16 @@ export const EVENTS_QUERY_KEY = ['events']
 export const eventDetailQueryKey = (id: string) => ['events', id]
 
 /**
- * Hook to fetch all events with caching
+ * Hook to fetch all events with caching and instant fixture seeding
  */
 export function useEventsQuery() {
   return useQuery<EventsApiResponse>({
     queryKey: EVENTS_QUERY_KEY,
     queryFn: getAllEvents,
+    initialData: () => ({
+      events: FIXTURE_EVENTS,
+    }),
+    staleTime: 60 * 1000,
   })
 }
 

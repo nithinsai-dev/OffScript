@@ -156,8 +156,26 @@ export function Cursor() {
       quickCursorY(y)
 
       if (quickLabelX && quickLabelY) {
-        quickLabelX(x + 14)
-        quickLabelY(y + 14)
+        const labelEl = labelRef.current
+        const labelWidth = labelEl?.firstElementChild?.clientWidth || 75
+        const labelHeight = labelEl?.firstElementChild?.clientHeight || 28
+
+        // If it would overflow right edge, flip to left of cursor; else right
+        const targetX = x + 14 + labelWidth > window.innerWidth - 12
+          ? x - labelWidth - 14
+          : x + 14
+
+        // If it would overflow bottom edge, flip above cursor; else below
+        const targetY = y + 14 + labelHeight > window.innerHeight - 12
+          ? y - labelHeight - 14
+          : y + 14
+
+        // Clamp inside viewport
+        const clampedX = Math.max(12, Math.min(window.innerWidth - labelWidth - 12, targetX))
+        const clampedY = Math.max(12, Math.min(window.innerHeight - labelHeight - 12, targetY))
+
+        quickLabelX(clampedX)
+        quickLabelY(clampedY)
       }
 
       // Add to ink trail

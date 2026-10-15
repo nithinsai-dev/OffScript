@@ -17,6 +17,36 @@ export interface EventsSearchSchema {
   status?: 'OPEN' | 'CLOSED'
 }
 
+const DEFAULT_CATEGORIES = [
+  'Aerial Robotics',
+  'Art & Design',
+  'Artificial Intelligence',
+  'Arts & Craft',
+  'Astronomy',
+  'Coding',
+  'Cybersecurity',
+  'Dance',
+  'Debate & Literary',
+  'Design',
+  'Design & Product',
+  'Engineering',
+  'Entrepreneurship',
+  'Film & Media',
+  'Food & Culture',
+  'Gaming',
+  'Hackathon',
+  'Literary Arts',
+  'Music',
+  'Photography',
+  'Quiz & Culture',
+  'Robotics',
+  'Robotics & Electronics',
+  'Sustainability',
+  'Theatre',
+  'Visual Arts',
+  'Web Development',
+]
+
 export function EventsPage() {
   const { data, isLoading, isError, error, refetch } = useEventsQuery()
   const searchParams = useSearch({ from: '/events' }) as EventsSearchSchema
@@ -82,9 +112,9 @@ export function EventsPage() {
   const hasCachedData = events.length > 0
   const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
 
-  // Categories extracted from loaded events
+  // Categories extracted from loaded events with DEFAULT_CATEGORIES to eliminate height jump
   const categories = useMemo(() => {
-    const set = new Set<string>()
+    const set = new Set<string>(DEFAULT_CATEGORIES)
     events.forEach((e) => {
       if (e.category) set.add(e.category)
     })
@@ -130,15 +160,15 @@ export function EventsPage() {
     })
   }, [events, searchParams, deferredSearch])
 
-  // Progressive rendering: initial 12 cards, rest progressively
-  const [visibleCount, setVisibleCount] = useState(12)
+  // Progressive rendering: initial 9 cards on first paint, rest progressively
+  const [visibleCount, setVisibleCount] = useState(9)
   const filterKey = `${searchParams.q || ''}_${searchParams.category || ''}_${searchParams.mode || ''}_${searchParams.price || ''}_${searchParams.status || ''}`
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
 
   // Reset visibleCount when filters change
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey)
-    setVisibleCount(12)
+    setVisibleCount(9)
   }
 
   const displayedEvents = filteredEvents.slice(0, visibleCount)
@@ -159,7 +189,7 @@ export function EventsPage() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) {
-          setVisibleCount((prev) => prev + 12)
+          setVisibleCount((prev) => prev + 9)
         }
       },
       { rootMargin: '350px' }
@@ -279,7 +309,7 @@ export function EventsPage() {
 
             {/* Live Result Count & Reset Button */}
             <div className="flex items-center justify-between sm:justify-end gap-4 font-mono text-xs">
-              <span className="text-bone/60">
+              <span className="text-bone/60 tabular-nums inline-block min-w-[190px]">
                 Showing <span className="text-volt font-bold">{filteredEvents.length}</span> of {events.length} events
               </span>
               {isFiltered && (
@@ -295,7 +325,7 @@ export function EventsPage() {
           </div>
 
           {/* Category Filter Chips with Sliding Indicator */}
-          <div className="flex flex-wrap items-center gap-2 select-none" role="tablist" aria-label="Event categories">
+          <div className="flex overflow-x-auto sm:flex-wrap items-center gap-2 select-none py-1 scrollbar-none" role="tablist" aria-label="Event categories">
             {['ALL', ...categories].map((cat) => {
               const currentCat = searchParams.category || 'ALL'
               const isActive = currentCat.toLowerCase() === cat.toLowerCase()
@@ -306,7 +336,7 @@ export function EventsPage() {
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => handleCategorySelect(cat)}
-                  className={`relative px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt border ${
+                  className={`relative shrink-0 px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt border ${
                     isActive
                       ? 'text-ink font-black border-volt'
                       : 'text-bone/70 border-bone/20 hover:border-bone/50 bg-bone/[0.02]'
@@ -398,8 +428,8 @@ export function EventsPage() {
           </div>
         </div>
 
-        {/* Loading Skeletons: rendered ONLY while initial data is in flight */}
-        {isLoading && (
+        {/* Loading Skeletons: rendered ONLY while initial data is in flight and no cached data exists */}
+        {isLoading && !hasCachedData && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 pt-4">
             {Array.from({ length: 12 }).map((_, i) => (
               <EventCardSkeleton key={i} />
@@ -419,7 +449,7 @@ export function EventsPage() {
         )}
 
         {/* Events Grid (Live or Cached) */}
-        {!isLoading && hasCachedData && (
+        {hasCachedData && (
           <>
             {filteredEvents.length === 0 ? (
               /* Designed Empty State */
@@ -445,7 +475,7 @@ export function EventsPage() {
               </div>
             ) : (
               <div className="space-y-8 pt-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
                   <AnimatePresence>
                     {displayedEvents.map((event: Event, index: number) => (
                       <EventCard

@@ -40,12 +40,13 @@
     <script>
       (function() {
         try {
-          var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-          var lowCores = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
-          var lowMem = navigator.deviceMemory && navigator.deviceMemory <= 4;
+          var isTouch = 'ontouchstart' in window || (navigator.maxTouchPoints != null && navigator.maxTouchPoints > 0);
+          var isMobileUA = /Mobi|Android|iPhone|iPad|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          var lowCores = navigator.hardwareConcurrency != null && navigator.hardwareConcurrency <= 4;
+          var lowMem = navigator.deviceMemory != null && navigator.deviceMemory <= 4;
           var saveData = navigator.connection && navigator.connection.saveData;
           var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          if (isTouch || lowCores || lowMem || saveData || reduced) {
+          if (isTouch || isMobileUA || lowCores || lowMem || saveData || reduced) {
             document.documentElement.setAttribute('data-perf', 'lite');
           } else {
             document.documentElement.setAttribute('data-perf', 'full');

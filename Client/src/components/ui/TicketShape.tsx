@@ -8,10 +8,12 @@ interface TicketShapeProps {
   stubContent?: ReactNode
   overlayContent?: ReactNode
   className?: string
+  bodyClassName?: string
   stubWidth?: number // desktop stub width (default 130px)
   isHovered?: boolean
   tearOnHover?: boolean // ONLY true for Featured stacking cards
   hoverStroke?: boolean // default true, false disables hover border color change
+  hasPerforation?: boolean
   onMouseEnter?: () => void
   onMouseLeave?: () => void
 }
@@ -21,8 +23,14 @@ interface TicketShapeProps {
  */
 const pathCache = new Map<string, string>()
 
-function generateTicketPath(W: number, H: number, P: number, isMobile: boolean): string {
-  const key = `${W}_${H}_${P}_${isMobile}`
+function generateTicketPath(
+  W: number,
+  H: number,
+  P: number,
+  isMobile: boolean,
+  hasPerforation: boolean = true
+): string {
+  const key = `${W}_${H}_${P}_${isMobile}_${hasPerforation}`
   const cached = pathCache.get(key)
   if (cached) return cached
 
@@ -30,11 +38,30 @@ function generateTicketPath(W: number, H: number, P: number, isMobile: boolean):
   const R_perf = 9
   const R_mid = 7
 
-  const path = isMobile
-    ? `
+  let path: string
+
+  if (!hasPerforation) {
+    path = `
+      M ${R_corner} 0
+      L ${W - R_corner} 0
+      A ${R_corner} ${R_corner} 0 0 0 ${W} ${R_corner}
+      L ${W} ${H / 2 - R_mid}
+      A ${R_mid} ${R_mid} 0 0 0 ${W} ${H / 2 + R_mid}
+      L ${W} ${H - R_corner}
+      A ${R_corner} ${R_corner} 0 0 0 ${W - R_corner} ${H}
+      L ${R_corner} ${H}
+      A ${R_corner} ${R_corner} 0 0 0 0 ${H - R_corner}
+      L 0 ${H / 2 + R_mid}
+      A ${R_mid} ${R_mid} 0 0 0 0 ${H / 2 - R_mid}
+      L 0 ${R_corner}
+      A ${R_corner} ${R_corner} 0 0 0 ${R_corner} 0
+      Z
+    `
+  } else if (isMobile) {
+    path = `
       M ${R_corner} 0
       L ${W / 2 - R_mid} 0
-      A ${R_mid} ${R_mid} 0 0 1 ${W / 2 + R_mid} 0
+      A ${R_mid} ${R_mid} 0 0 0 ${W / 2 + R_mid} 0
       L ${W - R_corner} 0
       A ${R_corner} ${R_corner} 0 0 0 ${W} ${R_corner}
       L ${W} ${P - R_perf}
@@ -42,35 +69,37 @@ function generateTicketPath(W: number, H: number, P: number, isMobile: boolean):
       L ${W} ${H - R_corner}
       A ${R_corner} ${R_corner} 0 0 0 ${W - R_corner} ${H}
       L ${W / 2 + R_mid} ${H}
-      A ${R_mid} ${R_mid} 0 0 1 ${W / 2 - R_mid} ${H}
+      A ${R_mid} ${R_mid} 0 0 0 ${W / 2 - R_mid} ${H}
       L ${R_corner} ${H}
       A ${R_corner} ${R_corner} 0 0 0 0 ${H - R_corner}
       L 0 ${P + R_perf}
-      A ${R_perf} ${R_perf} 0 0 1 0 ${P - R_perf}
+      A ${R_perf} ${R_perf} 0 0 0 0 ${P - R_perf}
       L 0 ${R_corner}
       A ${R_corner} ${R_corner} 0 0 0 ${R_corner} 0
       Z
     `
-    : `
+  } else {
+    path = `
       M ${R_corner} 0
       L ${P - R_perf} 0
-      A ${R_perf} ${R_perf} 0 0 1 ${P + R_perf} 0
+      A ${R_perf} ${R_perf} 0 0 0 ${P + R_perf} 0
       L ${W - R_corner} 0
       A ${R_corner} ${R_corner} 0 0 0 ${W} ${R_corner}
       L ${W} ${H / 2 - R_mid}
-      A ${R_mid} ${R_mid} 0 0 1 ${W} ${H / 2 + R_mid}
+      A ${R_mid} ${R_mid} 0 0 0 ${W} ${H / 2 + R_mid}
       L ${W} ${H - R_corner}
       A ${R_corner} ${R_corner} 0 0 0 ${W - R_corner} ${H}
       L ${P + R_perf} ${H}
-      A ${R_perf} ${R_perf} 0 0 1 ${P - R_perf} ${H}
+      A ${R_perf} ${R_perf} 0 0 0 ${P - R_perf} ${H}
       L ${R_corner} ${H}
       A ${R_corner} ${R_corner} 0 0 0 0 ${H - R_corner}
       L 0 ${H / 2 + R_mid}
-      A ${R_mid} ${R_mid} 0 0 1 0 ${H / 2 - R_mid}
+      A ${R_mid} ${R_mid} 0 0 0 0 ${H / 2 - R_mid}
       L 0 ${R_corner}
       A ${R_corner} ${R_corner} 0 0 0 ${R_corner} 0
       Z
     `
+  }
 
   pathCache.set(key, path)
   return path
@@ -122,16 +151,26 @@ export function TicketShape({
   stubContent,
   overlayContent,
   className = '',
+  bodyClassName,
   stubWidth = 170,
   isHovered: externalHover,
   tearOnHover = false,
   hoverStroke = true,
+  hasPerforation = stubContent !== undefined,
   onMouseEnter,
   onMouseLeave,
 }: TicketShapeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [dimensions, setDimensions] = useState({ width: 360, height: 480 })
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 640 : false
+  )
+  const [dimensions, setDimensions] = useState(() => {
+    const mobile = typeof window !== 'undefined' ? window.innerWidth < 640 : false
+    return {
+      width: typeof window !== 'undefined' ? (mobile ? Math.min(380, window.innerWidth - 32) : 360) : 360,
+      height: mobile ? 545 : 480,
+    }
+  })
   const [internalHover, setInternalHover] = useState(false)
   const prefersReduced = usePrefersReducedMotion()
 
@@ -185,7 +224,8 @@ export function TicketShape({
   const stubHeight = 110
   const P = isMobile ? Math.max(80, H - stubHeight) : Math.max(120, W - stubWidth)
 
-  const ticketPath = generateTicketPath(W, H, P, isMobile)
+  const R_perf = 9
+  const ticketPath = generateTicketPath(W, H, P, isMobile, hasPerforation)
 
   const handleEnter = () => {
     setInternalHover(true)
@@ -237,44 +277,49 @@ export function TicketShape({
         />
 
         {/* SVG Punch Hole Perforation Line - sits exactly on stub boundary */}
-        {isMobile ? (
-          <line
-            className="ticket-perforation"
-            x1="12"
-            y1={P}
-            x2={W - 12}
-            y2={P}
-            stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
-            strokeWidth="2"
-            strokeDasharray="2 6"
-            strokeLinecap="round"
-            strokeOpacity="0.45"
-          />
-        ) : (
-          <line
-            className="ticket-perforation"
-            x1={P}
-            y1="12"
-            x2={P}
-            y2={H - 12}
-            stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
-            strokeWidth="2"
-            strokeDasharray="2 6"
-            strokeLinecap="round"
-            strokeOpacity="0.45"
-          />
-        )}
+        {hasPerforation &&
+          (isMobile ? (
+            <line
+              className="ticket-perforation"
+              x1={R_perf}
+              y1={P}
+              x2={W - R_perf}
+              y2={P}
+              stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
+              strokeWidth="2"
+              strokeDasharray="2 6"
+              strokeLinecap="round"
+              strokeOpacity="0.45"
+            />
+          ) : (
+            <line
+              className="ticket-perforation"
+              x1={P}
+              y1={R_perf}
+              x2={P}
+              y2={H - R_perf}
+              stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
+              strokeWidth="2"
+              strokeDasharray="2 6"
+              strokeLinecap="round"
+              strokeOpacity="0.45"
+            />
+          ))}
       </svg>
 
       {/* Clipped Content Container */}
       <div
-        className="relative z-10 w-full h-full flex flex-col sm:flex-row overflow-hidden"
+        className="relative z-10 w-full h-full flex flex-col sm:flex-row overflow-hidden items-stretch"
         style={{ clipPath: `url(#${clipId})` }}
       >
         {overlayContent}
 
         {/* Main Body - content padding larger than scoop radius so nothing crosses outline */}
-        <div className="featured-ticket-content flex-1 flex flex-col min-w-0 p-6 sm:p-7 relative z-10">
+        <div
+          className={`featured-ticket-content flex-1 flex flex-col min-w-0 relative z-10 self-stretch ${
+            bodyClassName || 'p-6 sm:p-7'
+          }`}
+        >
           {children}
         </div>
 
@@ -309,10 +354,11 @@ export function TicketShape({
             style={{
               width: isMobile ? '100%' : 'var(--stub-w)',
               height: isMobile ? 'var(--stub-h)' : '100%',
+              alignSelf: 'stretch',
               borderLeft: isMobile ? 'none' : '1px solid rgba(237,235,224,0.1)',
               borderTop: isMobile ? '1px solid rgba(237,235,224,0.1)' : 'none',
             }}
-            className="featured-stub-column shrink-0 bg-bone/[0.02] p-4 sm:p-5 flex flex-col justify-between items-center text-center relative z-10"
+            className="featured-stub-column shrink-0 bg-bone/[0.02] p-4 sm:p-5 flex flex-col justify-between items-center text-center relative z-10 self-stretch"
           >
             {stubContent}
           </motion.div>

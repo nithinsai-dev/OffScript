@@ -2,7 +2,6 @@ import { useEffect, useRef, useCallback } from 'react'
 import gsap from 'gsap'
 import { useLenis } from '@/hooks/useLenis'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
-import { MOTION } from '@/lib/motion'
 import OverviewPane from './detail-tabs/OverviewPane'
 import ListContentPane from './detail-tabs/ListContentPane'
 import SchedulePane from './detail-tabs/SchedulePane'
@@ -48,12 +47,11 @@ export function OpenFullPanel({
   const backdropRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
-  const chipRef = useRef<HTMLDivElement | null>(null)
   const isClosingRef = useRef(false)
 
   const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
 
-  // Scroll lock while open
+  // Scroll lock while open - always unlocked on unmount/close/route change
   useEffect(() => {
     if (!cardId) return
 
@@ -73,157 +71,182 @@ export function OpenFullPanel({
     }
   }, [cardId, getLenis])
 
-  // CLOSE HANDLER: Different animation (scaleY fold 0.35s + chip swallowed into card 0.25s + Volt pulse + restore focus)
+  // CLOSE HANDLER: Content fades in 0.2s, clip-path shrinks to card rect over 0.6s, Volt border pulse, focus returns
   const handleCloseRequest = useCallback(() => {
     if (isClosingRef.current) return
     isClosingRef.current = true
 
     const modalEl = modalRef.current
     const backdropEl = backdropRef.current
-    const chipEl = chipRef.current
+    const contentEl = contentRef.current
 
-    if (prefersReduced) {
+    const finishClose = () => {
+      const lenis = getLenis()
+      if (lenis) lenis.start()
+      document.body.style.overflow = ''
       originatingElement?.focus()
       onClose()
+    }
+
+    if (prefersReduced) {
+      finishClose()
       return
     }
 
-    if (isLite || !modalEl || !backdropEl || !chipEl) {
+    if (isLite || !modalEl || !backdropEl) {
       if (modalEl && backdropEl) {
         gsap.to([modalEl, backdropEl], {
           opacity: 0,
-          duration: MOTION.openFullPanel.liteFade,
+          duration: 0.3,
           ease: 'power2.in',
-          onComplete: () => {
-            originatingElement?.focus()
-            onClose()
-          },
+          onComplete: finishClose,
         })
       } else {
-        originatingElement?.focus()
-        onClose()
+        finishClose()
       }
       return
     }
 
-    // Measure target return position (the button or card origin)
-    const btnRect = originatingElement
-      ? originatingElement.getBoundingClientRect()
-      : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 }
-    const targetX = btnRect.left + (btnRect.width > 0 ? btnRect.width / 2 : 0) - 28
-    const targetY = btnRect.top + (btnRect.height > 0 ? btnRect.height / 2 : 0) - 18
+    // Find card container element for rect recomputation
+    const cardContainer = originatingElement?.closest('.flip-card-item') as HTMLElement | null
 
-    const modalRect = modalEl.getBoundingClientRect()
-    const chipStartX = modalRect.left + modalRect.width / 2 - 28
-    const chipStartY = modalRect.top + modalRect.height / 2 - 18
+    if (!cardContainer) {
+      // Fallback 0.3s fade if card not found
+      gsap.to([modalEl, backdropEl], {
+        opacity: 0,
+        duration: 0.3,
+        ease: 'power2.in',
+        onComplete: finishClose,
+      })
+      return
+    }
 
     const closeTl = gsap.timeline({
       onComplete: () => {
-        // Quick Volt pulse on originating card border
-        if (originatingElement) {
-          const cardContainer = originatingElement.closest('.flip-card-item') || originatingElement
-          gsap.fromTo(
-            cardContainer,
-            { boxShadow: '0 0 16px 2px #D4FF3F' },
-            { boxShadow: '0 0 0px 0px transparent', duration: 0.35 }
-          )
-        }
-        originatingElement?.focus()
-        onClose()
+        // Pulse card border Volt once (opacity 1 to 0.4, 0.3s)
+        gsap.fromTo(
+          cardContainer,
+          { opacity: 1 },
+          {
+            opacity: 0.4,
+            duration: 0.15,
+            yoyo: true,
+            repeat: 1,
+            ease: 'power1.inOut',
+            onComplete: finishClose,
+          }
+        )
       },
     })
 
-    // 1. Fold down: scaleY to thin strip (0.35s)
-    closeTl.to(modalEl, {
-      scaleY: 0.02,
-      scaleX: 0.8,
-      duration: MOTION.openFullPanel.foldDown,
-      ease: 'power2.in',
-    })
-
-    // 2. Hide modal strip, spawn chip at center
-    closeTl.set(modalEl, { opacity: 0 })
-    closeTl.set(chipEl, {
-      x: chipStartX,
-      y: chipStartY,
-      scale: 1,
-      opacity: 1,
-      rotation: 0,
-    })
-
-    // 3. Chip swallowed back into card (0.25s)
-    closeTl.to(
-      chipEl,
-      {
-        x: targetX,
-        y: targetY,
-        scale: 0.2,
+    // 1. Content fades out in 0.2s
+    const contentChildren = contentEl ? Array.from(contentEl.children) : []
+    if (contentChildren.length > 0) {
+      closeTl.to(contentChildren, {
         opacity: 0,
-        duration: MOTION.openFullPanel.swallowBack,
+        duration: 0.2,
         ease: 'power2.in',
+      })
+    }
+
+    // 2. Recompute card & modal rects at close time (user may have scrolled)
+    const cardRect = cardContainer.getBoundingClientRect()
+    const modalRect = modalEl.getBoundingClientRect()
+
+    const topInset = Math.max(0, cardRect.top - modalRect.top)
+    const leftInset = Math.max(0, cardRect.left - modalRect.left)
+    const bottomInset = Math.max(0, modalRect.bottom - cardRect.bottom)
+    const rightInset = Math.max(0, modalRect.right - cardRect.right)
+
+    // 3. Panel clip-path shrinks back to source card over 0.6s with power3.inOut
+    closeTl.to(
+      modalEl,
+      {
+        clipPath: `inset(${topInset}px ${rightInset}px ${bottomInset}px ${leftInset}px)`,
+        duration: 0.6,
+        ease: 'power3.inOut',
       },
-      MOTION.openFullPanel.foldDown
+      contentChildren.length > 0 ? 0.15 : 0
     )
 
-    // 4. Backdrop fades out
+    // 4. Backdrop fades out over 0.6s
     closeTl.to(
       backdropEl,
       {
         opacity: 0,
-        duration: MOTION.openFullPanel.backdropFade,
-        ease: 'power2.in',
+        duration: 0.6,
+        ease: 'power3.inOut',
       },
-      MOTION.openFullPanel.foldDown * 0.8
+      contentChildren.length > 0 ? 0.15 : 0
     )
-  }, [prefersReduced, isLite, originatingElement, onClose])
+  }, [prefersReduced, isLite, originatingElement, onClose, getLenis])
 
-  // OPEN ANIMATION: Volt chip detaches from button (0.5s arc) -> unfolds to panel (0.55s) -> content staggers (0.05s)
+  // OPEN ANIMATION: True "card expands to full size" clip-path transition (0.75s)
   useEffect(() => {
     if (!cardId) return
 
     const modalEl = modalRef.current
     const backdropEl = backdropRef.current
-    const chipEl = chipRef.current
-    if (!modalEl || !backdropEl || !chipEl) return
+    const contentEl = contentRef.current
+    if (!modalEl || !backdropEl) return
 
     if (prefersReduced) {
       gsap.set(backdropEl, { opacity: 0.7 })
-      gsap.set(modalEl, { opacity: 1, scale: 1 })
+      gsap.set(modalEl, { opacity: 1, clipPath: 'inset(0px 0px 0px 0px)' })
       closeButtonRef.current?.focus()
       return
     }
 
     if (isLite) {
-      gsap.fromTo(backdropEl, { opacity: 0 }, { opacity: 0.7, duration: MOTION.openFullPanel.liteFade })
+      gsap.fromTo(backdropEl, { opacity: 0 }, { opacity: 0.7, duration: 0.3 })
       gsap.fromTo(
         modalEl,
         { opacity: 0, y: 30 },
         {
           opacity: 1,
           y: 0,
-          duration: MOTION.openFullPanel.liteFade,
+          duration: 0.3,
           onComplete: () => closeButtonRef.current?.focus(),
         }
       )
       return
     }
 
-    // Full Mode FLIP Opening Animation
-    const btnRect = originatingElement
-      ? originatingElement.getBoundingClientRect()
-      : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 }
-    const startX = btnRect.left + (btnRect.width > 0 ? btnRect.width / 2 : 0) - 28
-    const startY = btnRect.top + (btnRect.height > 0 ? btnRect.height / 2 : 0) - 18
+    // Full Mode Expansion: read flipped card's real bounding rect
+    const cardContainer = originatingElement?.closest('.flip-card-item') as HTMLElement | null
 
-    // Hide panel container initially while chip flies
-    gsap.set(modalEl, { opacity: 0 })
-    gsap.set(chipEl, {
-      x: startX,
-      y: startY,
-      scale: 1,
+    if (!cardContainer) {
+      // Fallback 0.3s fade if card not found
+      gsap.fromTo(backdropEl, { opacity: 0 }, { opacity: 0.7, duration: 0.3 })
+      gsap.fromTo(
+        modalEl,
+        { opacity: 0, scale: 0.96 },
+        {
+          opacity: 1,
+          scale: 1,
+          duration: 0.3,
+          onComplete: () => closeButtonRef.current?.focus(),
+        }
+      )
+      return
+    }
+
+    const cardRect = cardContainer.getBoundingClientRect()
+    const modalRect = modalEl.getBoundingClientRect()
+
+    const topInset = Math.max(0, cardRect.top - modalRect.top)
+    const leftInset = Math.max(0, cardRect.left - modalRect.left)
+    const bottomInset = Math.max(0, modalRect.bottom - cardRect.bottom)
+    const rightInset = Math.max(0, modalRect.right - cardRect.right)
+
+    // Set initial clipped state matching card rect
+    gsap.set(modalEl, {
       opacity: 1,
-      rotation: 0,
+      clipPath: `inset(${topInset}px ${rightInset}px ${bottomInset}px ${leftInset}px)`,
     })
+
+    const contentChildren = contentEl ? Array.from(contentEl.children) : []
+    gsap.set(contentChildren, { opacity: 0, y: 12 })
 
     const openTl = gsap.timeline({
       onComplete: () => {
@@ -231,104 +254,40 @@ export function OpenFullPanel({
       },
     })
 
-    // 1. Overlay fades in (0.3s)
+    // 1. Dim Ink 70% backdrop fades in over 0.75s
     openTl.to(
       backdropEl,
       {
         opacity: 0.7,
-        duration: MOTION.openFullPanel.backdropFade,
-        ease: 'power2.out',
+        duration: 0.75,
+        ease: 'power3.inOut',
       },
       0
     )
 
-    // Calculate center target for panel
-    const modalRect = modalEl.getBoundingClientRect()
-    const isMobile = window.innerWidth < 768
-    const targetX = isMobile ? window.innerWidth / 2 - 28 : modalRect.left + modalRect.width / 2 - 28
-    const targetY = isMobile ? window.innerHeight - 80 : modalRect.top + modalRect.height / 2 - 18
-
-    // 2. Chip flies along curved path (GSAP arc 0.5s)
+    // 2. Animate panel clip-path from matching card rect to inset(0) over 0.75s
     openTl.to(
-      chipEl,
-      {
-        x: targetX,
-        duration: MOTION.openFullPanel.chipArc,
-        ease: 'power2.inOut',
-      },
-      0
-    )
-    openTl.to(
-      chipEl,
-      {
-        y: targetY - 60,
-        duration: MOTION.openFullPanel.chipArc * 0.5,
-        ease: 'power2.out',
-      },
-      0
-    )
-    openTl.to(
-      chipEl,
-      {
-        y: targetY,
-        duration: MOTION.openFullPanel.chipArc * 0.5,
-        ease: 'power2.in',
-      },
-      MOTION.openFullPanel.chipArc * 0.5
-    )
-    openTl.to(
-      chipEl,
-      {
-        rotation: 12,
-        duration: MOTION.openFullPanel.chipArc * 0.5,
-        ease: 'power1.out',
-      },
-      0
-    )
-    openTl.to(
-      chipEl,
-      {
-        rotation: 0,
-        duration: MOTION.openFullPanel.chipArc * 0.5,
-        ease: 'power1.in',
-      },
-      MOTION.openFullPanel.chipArc * 0.5
-    )
-
-    // 3. Chip vanishes at arrival, panel unfolds (0.55s, ease power3.out)
-    const unfoldTime = MOTION.openFullPanel.chipArc
-    openTl.set(chipEl, { opacity: 0 }, unfoldTime)
-    openTl.fromTo(
       modalEl,
       {
-        opacity: 1,
-        scaleX: Math.max(0.05, 56 / (modalRect.width || 800)),
-        scaleY: Math.max(0.05, 36 / (modalRect.height || 600)),
-        transformOrigin: isMobile ? '50% 100%' : '50% 50%',
+        clipPath: 'inset(0px 0px 0px 0px)',
+        duration: 0.75,
+        ease: 'power3.inOut',
       },
-      {
-        scaleX: 1,
-        scaleY: 1,
-        duration: MOTION.openFullPanel.panelUnfold,
-        ease: 'power3.out',
-      },
-      unfoldTime
+      0
     )
 
-    // 4. Content elements fade up with 0.05s stagger
-    const contentChildren = contentRef.current ? Array.from(contentRef.current.children) : []
+    // 3. Panel content fades up with 0.05s stagger after shell reaches full size (~70% of duration = 0.52s)
     if (contentChildren.length > 0) {
-      openTl.fromTo(
-        contentChildren,
-        { opacity: 0, y: 16 },
+      openTl.to(
+        contentChildren.slice(0, 8),
         {
           opacity: 1,
           y: 0,
-          stagger: MOTION.openFullPanel.contentStagger,
-          duration: 0.35,
+          stagger: 0.05,
+          duration: 0.3,
           ease: 'power2.out',
         },
-        unfoldTime + 0.15
+        0.52
       )
     }
   }, [cardId, prefersReduced, isLite, originatingElement])
@@ -454,15 +413,6 @@ export function OpenFullPanel({
       aria-labelledby="open-full-panel-title"
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-6"
     >
-      {/* Detaching Volt Chamfered Chip ("ADMIT ONE") */}
-      <div
-        ref={chipRef}
-        aria-hidden="true"
-        className="fixed z-[60] w-[56px] h-[36px] bg-volt text-ink font-mono text-[9px] font-black uppercase flex items-center justify-center tracking-wider clip-chamfer pointer-events-none select-none shadow-md opacity-0"
-      >
-        ADMIT ONE
-      </div>
-
       {/* Backdrop (Page Dimmed at 70% Ink opacity) */}
       <div
         ref={backdropRef}
@@ -470,11 +420,11 @@ export function OpenFullPanel({
         className="fixed inset-0 bg-[#111210]/70 backdrop-blur-sm z-0 opacity-0 cursor-pointer"
       />
 
-      {/* Panel Container */}
+      {/* Panel Container - Volt 2px border visibly expands as panel edge */}
       <div
         ref={modalRef}
         data-lenis-prevent="true"
-        className="relative z-10 w-full max-w-4xl max-h-[88vh] md:max-h-[85vh] bg-[#111210] border-2 border-bone/30 shadow-[0_16px_40px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden clip-chamfer rounded-t-2xl md:rounded-none will-change-transform"
+        className="relative z-10 w-full max-w-4xl max-h-[88vh] md:max-h-[85vh] bg-[#111210] border-2 border-volt shadow-[0_16px_40px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden clip-chamfer rounded-t-2xl md:rounded-none will-change-[clip-path]"
       >
         {/* Header Bar */}
         <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b-2 border-bone/20 bg-bone/[0.03]">

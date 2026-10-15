@@ -102,8 +102,6 @@ export function LandingPage() {
 
           ctx = gsap.context(() => {
             const navbar = document.querySelector('header[role="banner"]')
-            const tagline = document.querySelector('#hero-tagline')
-            const supporting = document.querySelector('#hero-supporting')
             const buttons = document.querySelector('#hero-buttons')
             const statsEl = document.querySelector('#hero-stats')
             const sticker = document.querySelector('#hero-sticker')
@@ -132,23 +130,13 @@ export function LandingPage() {
               )
             }
 
-            // 2. Typed #beoffscript begins at ~0.6s
-            if (tagline) {
+            // 2. Buttons rise at ~0.4s
+            if (buttons) {
               tl.fromTo(
-                tagline,
-                { y: 20, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.35, ease: 'power2.out' },
-                MOTION.landingHero.typedStart
-              )
-            }
-
-            // 3. Supporting line unmasks at ~0.9s
-            if (supporting) {
-              tl.fromTo(
-                supporting,
-                { y: 20, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.45, ease: 'power2.out' },
-                MOTION.landingHero.supportingLine
+                buttons,
+                { y: 15, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out' },
+                0.3
               )
             }
 
