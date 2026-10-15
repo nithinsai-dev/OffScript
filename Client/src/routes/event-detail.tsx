@@ -71,16 +71,21 @@ export function EventDetailPage() {
 
   const [imageError, setImageError] = useState(false)
   const [shakeDisabled, setShakeDisabled] = useState(false)
-  const [activeTabOverride, setActiveTabOverride] = useState<string | null>(null)
   const [openFullCardId, setOpenFullCardId] = useState<string | null>(null)
   const [originatingElement, setOriginatingElement] = useState<HTMLElement | null>(null)
+  const [isEligibilityExpanded, setIsEligibilityExpanded] = useState(false)
+
+  const rawEligibility = detailEvent?.eligibility || event?.eligibility || []
+  const eligibilityList = useMemo(
+    () => rawEligibility.map((s) => (typeof s === 'string' ? s.trim() : String(s))).filter(Boolean),
+    [rawEligibility]
+  )
 
   const availableCardIds = useMemo(
     () => [
       'overview',
       'highlights',
       'expect',
-      'eligibility',
       'prerequisites',
       'rules',
       'schedule',
@@ -196,8 +201,14 @@ export function EventDetailPage() {
           </div>
         </section>
 
-        {/* Mobile Sticky Note Placeholder Skeleton */}
-        <div className="lg:hidden max-w-6xl mx-auto px-4 sm:px-6 pt-6">
+        {/* Mobile Info Ticket & Sticky Note Skeleton */}
+        <div className="lg:hidden max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+          <div className="border-2 border-bone/20 p-6 space-y-4 bg-bone/[0.02]">
+            <SkeletonBlock className="h-10 w-36" />
+            <SkeletonBlock className="h-4 w-full" />
+            <SkeletonBlock className="h-12 w-full" />
+            <SkeletonBlock className="h-10 w-full" />
+          </div>
           <SkeletonBlock className="h-[178px] w-full" />
         </div>
 
@@ -220,7 +231,7 @@ export function EventDetailPage() {
                 </div>
               </div>
             </div>
-            <aside className="lg:col-span-5 xl:col-span-4 space-y-6">
+            <aside className="hidden lg:block lg:col-span-5 xl:col-span-4 space-y-6">
               <div className="border-2 border-bone/20 p-6 space-y-4 bg-bone/[0.02]">
                 <SkeletonBlock className="h-10 w-36" />
                 <SkeletonBlock className="h-4 w-full" />
@@ -257,19 +268,22 @@ export function EventDetailPage() {
   const priceBillingUnit = event.is_per_head ? 'per person' : 'per team'
 
   // STICKY NOTE: "Who can participate"
-  // Shows ONLY the team size line and the first eligibility item, with a small "All eligibility" link
-  const firstEligibility = detailEvent?.eligibility?.[0]
+  // Shows team size, then the FULL eligibility list with small Ink diamond bullets.
+  // Smoothly expands in place with 0.4s height animation. Protected against viewport overflow.
+  const isLongList = eligibilityList.length > 4
+  const visibleEligibility = isEligibilityExpanded || !isLongList ? eligibilityList : eligibilityList.slice(0, 4)
+  const hasTeamSize = event?.min_teamsize != null || event?.max_teamsize != null
 
   const stickyNote = (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      whileHover={{ rotate: 0, scale: 1.02 }}
-      transition={{ type: 'spring', damping: 14, stiffness: 220 }}
+      whileHover={{ rotate: 0, scale: 1.01 }}
+      transition={{ type: 'spring', damping: 16, stiffness: 220 }}
       style={{
         clipPath: 'polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%)',
       }}
-      className="relative bg-volt text-ink p-5 sm:p-6 border-2 border-ink/40 rotate-[-2deg] shadow-xl select-none h-[178px] flex flex-col justify-between"
+      className="eligibility-sticky-note relative bg-volt text-ink p-5 sm:p-6 border-2 border-ink/40 rotate-[-1.5deg] shadow-xl select-none flex flex-col justify-between max-h-[calc(100vh-26rem)]"
     >
       {/* Translucent tape strip on top */}
       <div
@@ -283,8 +297,8 @@ export function EventDetailPage() {
         className="absolute top-0 right-0 w-[22px] h-[22px] bg-ink/25 pointer-events-none"
       />
 
-      <div className="space-y-3">
-        <div className="space-y-1">
+      <div className="space-y-3 flex-1 flex flex-col overflow-hidden">
+        <div className="space-y-1 shrink-0">
           <span className="font-mono text-[9px] uppercase tracking-widest text-ink/70 font-black block">
             ENTRY NOTE
           </span>
@@ -293,31 +307,44 @@ export function EventDetailPage() {
           </h3>
         </div>
 
-        {/* Team Size line */}
-        <div className="font-mono text-xs text-ink/90 font-bold border-b border-ink/20 pb-2">
-          <span>Team: {formatTeamSize(event.min_teamsize, event.max_teamsize)}</span>
-        </div>
+        {/* Team Size line - only if available */}
+        {hasTeamSize && (
+          <div className="font-mono text-xs text-ink/90 font-bold border-b border-ink/20 pb-2 shrink-0">
+            <span>Team: {formatTeamSize(event.min_teamsize, event.max_teamsize)}</span>
+          </div>
+        )}
 
-        {/* First eligibility item only */}
-        <div className="space-y-2 font-sans text-xs text-ink/90 font-medium leading-snug">
-          {firstEligibility ? (
-            <div className="flex items-start gap-1.5">
-              <span className="font-mono font-bold text-ink">›</span>
-              <span className="line-clamp-2">{firstEligibility}</span>
-            </div>
-          ) : (
-            <p>Open for all registered university students with valid student ID card.</p>
-          )}
-
-          {/* Link that switches to Eligibility tab */}
-          <button
-            type="button"
-            onClick={() => setActiveTabOverride('eligibility')}
-            className="font-mono text-[10px] uppercase font-black tracking-wider text-ink underline hover:opacity-80 block pt-1 text-left"
+        {/* Full Eligibility list with small Ink diamond bullets */}
+        {eligibilityList.length > 0 && (
+          <motion.div
+            layout
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="flex-1 overflow-y-auto pr-1 space-y-2 overscroll-contain"
           >
-            All eligibility →
-          </button>
-        </div>
+            <ul className="space-y-1.5 font-sans text-xs text-ink/90 font-medium leading-snug">
+              {visibleEligibility.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span
+                    className="w-1.5 h-1.5 bg-ink rotate-45 shrink-0 mt-1"
+                    aria-hidden="true"
+                  />
+                  <span className="flex-1">{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Expand / Collapse toggle if > 4 items */}
+            {isLongList && (
+              <button
+                type="button"
+                onClick={() => setIsEligibilityExpanded((prev) => !prev)}
+                className="font-mono text-[10px] uppercase font-black tracking-wider text-ink underline hover:opacity-80 block pt-1.5 text-left"
+              >
+                {isEligibilityExpanded ? 'Show less ↑' : `Show all (${eligibilityList.length}) ↓`}
+              </button>
+            )}
+          </motion.div>
+        )}
       </div>
     </motion.div>
   )
@@ -527,8 +554,9 @@ export function EventDetailPage() {
         </div>
       </section>
 
-      {/* MOBILE ONLY: STICKY NOTE DIRECTLY AFTER HERO */}
-      <div className="lg:hidden max-w-6xl mx-auto px-4 sm:px-6 pt-6 h-[202px]">
+      {/* MOBILE ONLY: INFO TICKET & STICKY NOTE DIRECTLY AFTER HERO (NON-STICKY) */}
+      <div className="lg:hidden max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+        {infoTicketPanel}
         {stickyNote}
       </div>
 
@@ -548,7 +576,6 @@ export function EventDetailPage() {
                   setOpenFullCardId(cardId)
                   setOriginatingElement(originatingEl || null)
                 }}
-                activeCardOverride={activeTabOverride}
                 isShutterReady={isShutterReady}
               />
             </AnimatePresence>
@@ -573,13 +600,13 @@ export function EventDetailPage() {
             )}
           </div>
 
-          {/* RIGHT COLUMN: STICKY STACK (Info Ticket + Sticky Note) */}
-          <aside className="lg:col-span-5 xl:col-span-4 sticky top-28 space-y-6">
+          {/* RIGHT COLUMN: STICKY STACK (Desktop only: Info Ticket + Sticky Note) */}
+          <aside className="hidden lg:block lg:col-span-5 xl:col-span-4 sticky top-28 space-y-6">
             {/* 1. Ticket Info Panel (Static ticket silhouette, no tear) */}
             {infoTicketPanel}
 
             {/* 2. Sticky Note on Desktop */}
-            <div className="hidden lg:block pt-2">
+            <div className="pt-2">
               {stickyNote}
             </div>
           </aside>

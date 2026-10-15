@@ -6,6 +6,7 @@ import { EventCardSkeleton } from '@/components/ui/Skeletons'
 import { SectionError } from '@/components/ui/SectionError'
 import { useEventsQuery } from '@/features/events/queries'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { handleRouteChangeReveals } from '@/lib/reveal'
 import type { Event } from '@/types/event'
 
 export interface EventsSearchSchema {
@@ -24,6 +25,12 @@ export function EventsPage() {
 
   const [shutterDone, setShutterDone] = useState(false)
   const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
+
+  // Shutter transition failsafe timer so content is never blocked
+  useEffect(() => {
+    const t = setTimeout(() => setShutterDone(true), 500)
+    return () => clearTimeout(t)
+  }, [])
 
   // Per-route SEO title and meta
   useEffect(() => {
@@ -136,6 +143,11 @@ export function EventsPage() {
 
   const displayedEvents = filteredEvents.slice(0, visibleCount)
   const hasMore = visibleCount < filteredEvents.length
+
+  // Re-scan and reveal in-view cards immediately when displayed events update or filters change
+  useEffect(() => {
+    handleRouteChangeReveals()
+  }, [displayedEvents.length, filterKey])
 
   // Near-end observer to automatically load more cards when scrolled close to bottom
   useEffect(() => {

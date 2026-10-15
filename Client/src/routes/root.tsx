@@ -10,6 +10,7 @@ import { CursorProvider } from '@/hooks/useCursor'
 import { ToastProvider } from '@/components/ui/Toast'
 import { OfflineBanner } from '@/components/ui/OfflineBanner'
 import { usePerfGovernor } from '@/hooks/usePerfGovernor'
+import { initRevealSystem, handleRouteChangeReveals } from '@/lib/reveal'
 
 const LazyCursor = lazy(() =>
   import('@/components/effects/Cursor').then((m) => ({ default: m.Cursor }))
@@ -24,6 +25,16 @@ export function RootLayout() {
   const locationKey = routerState.location.pathname
 
   const [mountDesktopEffects, setMountDesktopEffects] = useState(false)
+
+  // Initialize universal scroll reveal system
+  useEffect(() => {
+    initRevealSystem()
+  }, [])
+
+  // Re-scan and check reveal states on every route transition
+  useEffect(() => {
+    handleRouteChangeReveals()
+  }, [locationKey])
 
   useEffect(() => {
     // Check if lite mode is active (set on <html> before first paint)

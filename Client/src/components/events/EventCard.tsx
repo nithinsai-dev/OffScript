@@ -1,10 +1,11 @@
-import React, { useState, useId, useRef, useCallback } from 'react'
+import React, { useState, useId, useRef, useCallback, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { TicketShape, TicketBarcode } from '@/components/ui/TicketShape'
 import { SeatsBar } from '@/components/events/SeatsBar'
 import { formatPrice } from '@/lib/formatters'
 import { FALLBACK_COVER_IMAGE } from '@/lib/schemas'
 import { useCursor } from '@/hooks/useCursor'
+import { registerReveal } from '@/lib/reveal'
 import type { Event } from '@/types/event'
 
 interface EventCardProps {
@@ -24,6 +25,12 @@ function EventCardComponent({ event, isEager = false, className = '' }: EventCar
   const cardRectRef = useRef<DOMRect | null>(null)
   const rafIdRef = useRef<number | null>(null)
   const leaveTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el || isEager) return
+    return registerReveal(el, 'card')
+  }, [isEager])
 
   const totalSeats = event.total_seats ?? 0
   const seatsFilled = event.seats_filled ?? 0
@@ -144,8 +151,9 @@ function EventCardComponent({ event, isEager = false, className = '' }: EventCar
       onPointerEnter={handlePointerEnter}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
-      data-reveal="card"
-      className={`event-card-perspective-wrapper relative group select-none ${className}`}
+      data-reveal={isEager ? undefined : 'card'}
+      data-in-hero={isEager ? 'true' : undefined}
+      className={`event-card-perspective-wrapper relative group select-none ${className} ${isEager ? 'is-revealed' : ''}`}
       style={{ perspective: '900px' }}
     >
       <div

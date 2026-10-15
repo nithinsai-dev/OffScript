@@ -388,7 +388,9 @@ export function runCardQuickSequence(
     return () => {
       ctx.revert()
     }
-  } catch {
+  } catch (err) {
+    console.warn('[OFFSCRIPT] cardSequence error, showing cards directly:', err)
+    gridWrapperEl.removeAttribute('data-enter')
     cardElements.forEach((el) => {
       el.style.opacity = '1'
       el.style.transform = 'none'

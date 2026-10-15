@@ -38,6 +38,8 @@ export function Cursor() {
     const canvas = canvasRef.current
     if (!cursorEl || !canvas) return
 
+    gsap.set(cursorEl, { xPercent: -50, yPercent: -50 })
+
     const quickCursorX = gsap.quickTo(cursorEl, 'x', { duration: 0.08, ease: 'power2.out' })
     const quickCursorY = gsap.quickTo(cursorEl, 'y', { duration: 0.08, ease: 'power2.out' })
 
@@ -215,7 +217,7 @@ export function Cursor() {
       <div
         ref={cursorRef}
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 z-[99999] -translate-x-1/2 -translate-y-1/2"
+        className="pointer-events-none fixed top-0 left-0 z-[99999]"
       >
         <motion.div
           animate={{

@@ -16,6 +16,7 @@ import { SectionError } from '@/components/ui/SectionError'
 import { useEventsQuery } from '@/features/events/queries'
 import { useLenis, easeOutExpo } from '@/hooks/useLenis'
 import { MOTION } from '@/lib/motion'
+import { handleRouteChangeReveals } from '@/lib/reveal'
 
 const LazyLineupSection = lazy(() =>
   import('@/components/events/LineupSection').then((m) => ({ default: m.LineupSection }))
@@ -57,6 +58,11 @@ export function LandingPage() {
     }
   }, [scrollTo])
 
+  // Re-scan and reveal in-view content when events data resolves
+  useEffect(() => {
+    handleRouteChangeReveals()
+  }, [hasCachedData])
+
   // PART 8: Landing Page Hero Entry Timeline (dynamically imported after load, never blocking paint)
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -70,104 +76,157 @@ export function LandingPage() {
     const runHeroTimeline = () => {
       if (isCleanedUp) return
 
-      import('gsap').then(({ default: gsap }) => {
-        if (isCleanedUp) return
-
-        ctx = gsap.context(() => {
-          const navbar = document.querySelector('header[role="banner"]')
-          const tagline = document.querySelector('#hero-tagline')
-          const supporting = document.querySelector('#hero-supporting')
-          const buttons = document.querySelector('#hero-buttons')
-          const statsEl = document.querySelector('#hero-stats')
-          const sticker = document.querySelector('#hero-sticker')
-          const marquee = document.querySelector('#hero-marquee')
-
-          const tl = gsap.timeline()
-
-          // 1. Navbar drops in (0.2s)
-          if (navbar) {
-            tl.fromTo(
-              navbar,
-              { y: -80, opacity: 0 },
-              { y: 0, opacity: 1, duration: MOTION.landingHero.navbarDrop, ease: 'power2.out' },
-              0
-            )
+      // Safety failsafe: ensure all hero elements are visible within 2.5s
+      const heroSafety = setTimeout(() => {
+        const heroElements = [
+          'header[role="banner"]',
+          '#hero-tagline',
+          '#hero-supporting',
+          '#hero-buttons',
+          '#hero-stats',
+          '#hero-sticker',
+          '#hero-marquee',
+        ]
+        heroElements.forEach((sel) => {
+          const el = document.querySelector<HTMLElement>(sel)
+          if (el) {
+            el.style.opacity = '1'
+            el.style.transform = 'none'
           }
-
-          // 2. Typed #beoffscript begins at ~0.6s
-          if (tagline) {
-            tl.fromTo(
-              tagline,
-              { y: 20, opacity: 0 },
-              { y: 0, opacity: 1, duration: 0.35, ease: 'power2.out' },
-              MOTION.landingHero.typedStart
-            )
-          }
-
-          // 3. Supporting line unmasks at ~0.9s
-          if (supporting) {
-            tl.fromTo(
-              supporting,
-              { y: 20, opacity: 0 },
-              { y: 0, opacity: 1, duration: 0.45, ease: 'power2.out' },
-              MOTION.landingHero.supportingLine
-            )
-          }
-
-          // 4. Two buttons rise with a small overshoot at ~1.1s
-          if (buttons) {
-            tl.fromTo(
-              buttons,
-              { y: 25, opacity: 0 },
-              { y: 0, opacity: 1, duration: 0.45, ease: 'back.out(1.5)' },
-              MOTION.landingHero.buttonsRise
-            )
-          }
-
-          // 5. Stats count up from ~1.3s over 1.8s
-          if (statsEl) {
-            tl.fromTo(
-              statsEl,
-              { y: 30, opacity: 0 },
-              { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out' },
-              MOTION.landingHero.statsStart
-            )
-            tl.add(() => {
-              window.dispatchEvent(new CustomEvent('reveal-count-up'))
-            }, MOTION.landingHero.statsStart)
-          }
-
-          // 6. Floating sticker springs in at ~1.5s
-          if (sticker) {
-            tl.fromTo(
-              sticker,
-              { scale: 0, rotation: -20, opacity: 0 },
-              { scale: 1, rotation: 6, opacity: 1, duration: 0.6, ease: 'back.out(2.2)' },
-              MOTION.landingHero.stickerSpring
-            )
-          }
-
-          // 7. Marquee fades in at ~1.7s
-          if (marquee) {
-            tl.fromTo(
-              marquee,
-              { opacity: 0 },
-              { opacity: 1, duration: 0.6, ease: 'power1.out' },
-              MOTION.landingHero.marqueeFade
-            )
-          }
-
-          // Skippable: click, key, or scroll immediately completes the timeline
-          const skipTimeline = () => {
-            tl.progress(1)
-          }
-
-          window.addEventListener('pointerdown', skipTimeline, { once: true, passive: true })
-          window.addEventListener('keydown', skipTimeline, { once: true, passive: true })
-          window.addEventListener('wheel', skipTimeline, { once: true, passive: true })
-          window.addEventListener('touchstart', skipTimeline, { once: true, passive: true })
         })
-      })
+      }, 2500)
+
+      import('gsap')
+        .then(({ default: gsap }) => {
+          if (isCleanedUp) return
+
+          ctx = gsap.context(() => {
+            const navbar = document.querySelector('header[role="banner"]')
+            const tagline = document.querySelector('#hero-tagline')
+            const supporting = document.querySelector('#hero-supporting')
+            const buttons = document.querySelector('#hero-buttons')
+            const statsEl = document.querySelector('#hero-stats')
+            const sticker = document.querySelector('#hero-sticker')
+            const marquee = document.querySelector('#hero-marquee')
+
+            const tl = gsap.timeline({
+              onComplete: () => {
+                clearTimeout(heroSafety)
+                if (navbar) gsap.set(navbar, { clearProps: 'transform,opacity' })
+              },
+            })
+
+            // 1. Navbar drops in (0.2s)
+            if (navbar) {
+              tl.fromTo(
+                navbar,
+                { y: -80, opacity: 0 },
+                {
+                  y: 0,
+                  opacity: 1,
+                  duration: MOTION.landingHero.navbarDrop,
+                  ease: 'power2.out',
+                  clearProps: 'transform,opacity',
+                },
+                0
+              )
+            }
+
+            // 2. Typed #beoffscript begins at ~0.6s
+            if (tagline) {
+              tl.fromTo(
+                tagline,
+                { y: 20, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.35, ease: 'power2.out' },
+                MOTION.landingHero.typedStart
+              )
+            }
+
+            // 3. Supporting line unmasks at ~0.9s
+            if (supporting) {
+              tl.fromTo(
+                supporting,
+                { y: 20, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.45, ease: 'power2.out' },
+                MOTION.landingHero.supportingLine
+              )
+            }
+
+            // 4. Two buttons rise with a small overshoot at ~1.1s
+            if (buttons) {
+              tl.fromTo(
+                buttons,
+                { y: 25, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.45, ease: 'back.out(1.5)' },
+                MOTION.landingHero.buttonsRise
+              )
+            }
+
+            // 5. Stats count up from ~1.3s over 1.8s
+            if (statsEl) {
+              tl.fromTo(
+                statsEl,
+                { y: 30, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out' },
+                MOTION.landingHero.statsStart
+              )
+              tl.add(() => {
+                window.dispatchEvent(new CustomEvent('reveal-count-up'))
+              }, MOTION.landingHero.statsStart)
+            }
+
+            // 6. Floating sticker springs in at ~1.5s
+            if (sticker) {
+              tl.fromTo(
+                sticker,
+                { scale: 0, rotation: -20, opacity: 0 },
+                { scale: 1, rotation: 6, opacity: 1, duration: 0.6, ease: 'back.out(2.2)' },
+                MOTION.landingHero.stickerSpring
+              )
+            }
+
+            // 7. Marquee fades in at ~1.7s
+            if (marquee) {
+              tl.fromTo(
+                marquee,
+                { opacity: 0 },
+                { opacity: 1, duration: 0.6, ease: 'power1.out' },
+                MOTION.landingHero.marqueeFade
+              )
+            }
+
+            // Skippable: click, key, or scroll immediately completes the timeline
+            const skipTimeline = () => {
+              clearTimeout(heroSafety)
+              tl.progress(1)
+            }
+
+            window.addEventListener('pointerdown', skipTimeline, { once: true, passive: true })
+            window.addEventListener('keydown', skipTimeline, { once: true, passive: true })
+            window.addEventListener('wheel', skipTimeline, { once: true, passive: true })
+            window.addEventListener('touchstart', skipTimeline, { once: true, passive: true })
+          })
+        })
+        .catch((err) => {
+          console.warn('[OFFSCRIPT Hero] GSAP load failed, showing hero elements directly:', err)
+          clearTimeout(heroSafety)
+          const heroElements = [
+            'header[role="banner"]',
+            '#hero-tagline',
+            '#hero-supporting',
+            '#hero-buttons',
+            '#hero-stats',
+            '#hero-sticker',
+            '#hero-marquee',
+          ]
+          heroElements.forEach((sel) => {
+            const el = document.querySelector<HTMLElement>(sel)
+            if (el) {
+              el.style.opacity = '1'
+              el.style.transform = 'none'
+            }
+          })
+        })
     }
 
     if (document.readyState === 'complete') {
@@ -306,7 +365,7 @@ export function LandingPage() {
           </div>
         </section>
       ) : hasCachedData ? (
-        <div data-reveal="card">
+        <div data-reveal="rail">
           <FeaturedStack events={events} />
         </div>
       ) : isError || isOffline ? (

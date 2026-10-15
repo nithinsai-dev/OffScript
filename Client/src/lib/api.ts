@@ -83,13 +83,13 @@ export async function getEventById(id: string): Promise<EventDetail> {
     }
     return sanitized
   } catch (error) {
-    console.warn(`[OFFSCRIPT API] getEventById("${id}") error:`, error)
-    // Check fallback fixtures if offline
+    // Check fallback fixtures if live backend request fails or 404s
     const found = FIXTURE_EVENTS.find((e) => e.id === id)
     if (found) {
-      const sanitized = normalizeEventDetail({ event: found })
+      const sanitized = normalizeEventDetail(found)
       if (sanitized) return sanitized
     }
+    console.warn(`[OFFSCRIPT API] getEventById("${id}") error:`, error)
     throw normalizeHttpError(error, `Event with ID "${id}" was not found.`)
   }
 }

@@ -26,15 +26,34 @@ export const MOTION = {
 
   // PART 1: Flip Cards (Event detail page)
   flip: {
-    phase1: scaleDuration(0.32), // Front turns away: 0 to 90deg
-    phase2: scaleDuration(0.42), // Back turns in: -90 to 0deg
-    ease: 'power1.inOut',
-    cssEase: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    duration: scaleDuration(1.1), // 1.1s flip
+    liftOvershoot: scaleDuration(0.25), // 0.25s settle overshoot
+    ease: 'power3.inOut',
+    cssEase: 'cubic-bezier(0.77, 0, 0.175, 1)',
     reducedFade: scaleDuration(0.15), // 150ms cross-fade
-    flakeCount: 8,
-    flakeDuration: scaleDuration(0.55), // Burst drift & fade
-    flakeMinDist: 40,
-    flakeMaxDist: 70,
+    lockFailsafe: 1.5, // 1.5s lock failsafe timeout
+  },
+
+  // PART 1B: Ticket Punch Surprise
+  ticketPunch: {
+    duration: scaleDuration(0.9), // 0.9s total chip arc & gravity fall
+    chipArc: scaleDuration(0.38),
+    gravityFall: scaleDuration(0.52),
+    stampDuration: scaleDuration(0.15), // 0.15s stamp slam
+    shakeDuration: scaleDuration(0.2), // 3px shake
+  },
+
+  // PART 1C: "Open Full" Panel FLIP Fly-out & Swallow Close
+  openFullPanel: {
+    chipArc: scaleDuration(0.5), // 0.5s GSAP arc
+    panelUnfold: scaleDuration(0.55), // 0.55s unfold
+    contentStagger: scaleDuration(0.05), // 0.05s content stagger
+    totalOpen: scaleDuration(1.1), // ~1.1s total
+    foldDown: scaleDuration(0.35), // 0.35s scaleY fold
+    swallowBack: scaleDuration(0.25), // chip returns to card
+    totalClose: scaleDuration(0.6), // 0.6s total close
+    backdropFade: scaleDuration(0.3), // 0.3s backdrop fade
+    liteFade: scaleDuration(0.3), // Lite mode 0.3s
   },
 
   // PART 2: Shiny Hover Sheen (Event detail cards, desktop)

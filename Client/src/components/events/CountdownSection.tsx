@@ -141,6 +141,7 @@ export function CountdownSection({ events }: CountdownSectionProps) {
       <div className="space-y-3 max-w-xl mx-auto">
         <div className="flex items-center justify-center gap-3">
           <span
+            data-reveal="eyebrow"
             className={`font-mono text-[11px] sm:text-xs uppercase tracking-widest font-bold px-2 py-0.5 border ${
               isInverted
                 ? 'border-ink text-ink bg-volt'
@@ -158,13 +159,16 @@ export function CountdownSection({ events }: CountdownSectionProps) {
           </span>
         </div>
 
-        <h2
-          className={`font-display text-2xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight ${
-            isInverted ? 'text-ink' : 'text-bone'
-          }`}
-        >
-          {nearestTarget ? nearestTarget.event.name : 'Next Big Fest Pass'}
-        </h2>
+        <div className="overflow-hidden">
+          <h2
+            data-reveal="heading"
+            className={`font-display text-2xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight ${
+              isInverted ? 'text-ink' : 'text-bone'
+            }`}
+          >
+            {nearestTarget ? nearestTarget.event.name : 'Next Big Fest Pass'}
+          </h2>
+        </div>
 
         <p
           className={`font-sans text-xs sm:text-sm max-w-md mx-auto ${
@@ -178,7 +182,7 @@ export function CountdownSection({ events }: CountdownSectionProps) {
       </div>
 
       {/* Large Flip Counter Digits */}
-      <div className="flex justify-center items-center gap-2 sm:gap-4 md:gap-6 max-w-3xl mx-auto">
+      <div data-reveal="stat" className="flex justify-center items-center gap-2 sm:gap-4 md:gap-6 max-w-3xl mx-auto">
         <DigitCard value={countdown.days} label="Days" isInverted={isInverted} />
         <DigitCard value={countdown.hours} label="Hours" isInverted={isInverted} />
         <DigitCard value={countdown.minutes} label="Minutes" isInverted={isInverted} />

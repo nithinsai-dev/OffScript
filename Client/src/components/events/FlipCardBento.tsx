@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion } from 'motion/react'
+import gsap from 'gsap'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 import { SectionError } from '@/components/ui/SectionError'
 import type { EventDetail } from '@/types/event'
-import { MOTION, scaleMs } from '@/lib/motion'
+import { MOTION, MOTION_SCALE } from '@/lib/motion'
 import {
   shouldPlayFullSequence,
   runCardDropShatterSequence,
@@ -30,77 +31,6 @@ export interface CardDef {
   hasData: boolean
 }
 
-/**
- * Trigger 8 tiny Volt flakes burst on flip open (and lighter version on flip back)
- * Pure WAAPI / CSS, transform and opacity only, removed after 0.55s animation.
- * Never more than 8 flakes at once. None in lite mode or reduced motion.
- */
-function triggerFlakeBurst(cardEl: HTMLElement | null, mode: 'open' | 'close') {
-  if (!cardEl || typeof document === 'undefined') return
-  const isLite = document.documentElement.getAttribute('data-perf') === 'lite'
-  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (isLite || prefersReduced) return
-
-  const existing = cardEl.querySelector('.flake-burst-container')
-  if (existing) existing.remove()
-
-  const container = document.createElement('div')
-  container.className = 'flake-burst-container pointer-events-none absolute left-0 right-0 top-0 overflow-visible z-40'
-  container.setAttribute('aria-hidden', 'true')
-  cardEl.appendChild(container)
-
-  const flakeCount = MOTION.flip.flakeCount // 8 flakes
-  const durationMs = scaleMs(550) // 0.55s
-  const baseOpacity = mode === 'open' ? 0.9 : 0.6
-
-  for (let i = 0; i < flakeCount; i++) {
-    const flake = document.createElement('span')
-    const isDot = i % 2 === 1
-    const size = 4 + (i % 3) // 4px, 5px, 6px
-    const startX = 12 + i * 11 // spread across top edge
-
-    flake.style.position = 'absolute'
-    flake.style.width = `${size}px`
-    flake.style.height = `${size}px`
-    flake.style.backgroundColor = '#D4FF3F'
-    flake.style.pointerEvents = 'none'
-    flake.style.left = `${startX}%`
-    flake.style.top = '0px'
-    if (isDot) {
-      flake.style.borderRadius = '9999px'
-    }
-
-    container.appendChild(flake)
-
-    const driftX = (i - 3.5) * 14 + (Math.random() - 0.5) * 16
-    const driftY = -(40 + (i % 4) * 8 + Math.random() * 10) // 40px to 70px up
-    const rot = (i - 3.5) * 12 + (Math.random() - 0.5) * 20
-
-    if (typeof flake.animate === 'function') {
-      const anim = flake.animate(
-        [
-          { transform: 'translate3d(0, 0, 0) rotate(0deg)', opacity: baseOpacity },
-          { transform: `translate3d(${driftX}px, ${driftY}px, 0) rotate(${rot}deg)`, opacity: 0 },
-        ],
-        {
-          duration: durationMs,
-          easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-          fill: 'forwards',
-        }
-      )
-      if (i === 0) {
-        anim.onfinish = () => container.remove()
-      }
-    } else {
-      setTimeout(() => container.remove(), durationMs)
-    }
-  }
-
-  setTimeout(() => {
-    if (container.parentNode) container.remove()
-  }, durationMs + 200)
-}
-
 export function FlipCardBento({
   event,
   isDetailLoading = false,
@@ -113,11 +43,11 @@ export function FlipCardBento({
   const prefersReduced = usePrefersReducedMotion()
   const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
 
-  // Single parent store tracking active flipped card ID
-  const [activeFlippedCardId, setActiveFlippedCardId] = useState<string | null>(null)
-  // Explicit state machine per card: 'front' | 'toBack' | 'back' | 'toFront'
-  const [cardPhases, setCardPhases] = useState<Record<string, 'front' | 'toBack' | 'back' | 'toFront'>>({})
-  const [animatingCardId, setAnimatingCardId] = useState<string | null>(null)
+  // Single parent store tracking active flipped card ID (only one card flipped at a time)
+  const [flippedId, setFlippedId] = useState<string | null>(null)
+  const isFlipLockedRef = useRef(false)
+  const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const punchedCardsRef = useRef<Set<string>>(new Set())
 
   // Determine whether to play full drop-shatter sequence
   const willRunFull = useMemo(() => {
@@ -142,12 +72,23 @@ export function FlipCardBento({
         cancelSequenceRef.current()
         cancelSequenceRef.current = null
       }
+      if (lockTimerRef.current) {
+        clearTimeout(lockTimerRef.current)
+      }
     }
   }, [])
 
-  // Single IntersectionObserver: cards section is at least 25% in view
+  // IntersectionObserver: cards section in view (threshold 0.1) or already in view at mount
   useEffect(() => {
     if (hasTriggeredRef.current || !gridWrapperRef.current) return
+
+    // Immediate check if section is already in viewport
+    const rect = gridWrapperRef.current.getBoundingClientRect()
+    if (rect.top < window.innerHeight) {
+      setIsInView(true)
+      return
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries
@@ -156,14 +97,14 @@ export function FlipCardBento({
           observer.disconnect()
         }
       },
-      { threshold: 0.25 }
+      { threshold: 0.1 }
     )
 
     observer.observe(gridWrapperRef.current)
     return () => observer.disconnect()
   }, [])
 
-  // Card definitions with real data wiring
+  // Card definitions with real data wiring (Eligibility card removed, re-flowed without holes)
   const cards: CardDef[] = useMemo(() => {
     const list: CardDef[] = [
       {
@@ -191,24 +132,16 @@ export function FlipCardBento({
         hasData: Boolean(event?.what_to_expect && event.what_to_expect.length > 0),
       },
       {
-        id: 'eligibility',
-        number: '04',
-        title: 'Eligibility',
-        countBadge: event?.eligibility?.length ? `${event.eligibility.length} criteria` : 'Criteria',
-        desktopSpan: 'lg:col-span-1',
-        hasData: Boolean(event?.eligibility && event.eligibility.length > 0),
-      },
-      {
         id: 'prerequisites',
-        number: '05',
+        number: '04',
         title: 'Prerequisites',
         countBadge: event?.prerequisites?.length ? `${event.prerequisites.length} items` : 'Items',
-        desktopSpan: 'lg:col-span-1',
+        desktopSpan: 'lg:col-span-2',
         hasData: Boolean(event?.prerequisites && event.prerequisites.length > 0),
       },
       {
         id: 'rules',
-        number: '06',
+        number: '05',
         title: 'Rules',
         countBadge: event?.rules?.length ? `${event.rules.length} rules` : 'Rules',
         desktopSpan: 'lg:col-span-2',
@@ -216,7 +149,7 @@ export function FlipCardBento({
       },
       {
         id: 'schedule',
-        number: '07',
+        number: '06',
         title: 'Schedule',
         countBadge: event?.schedules?.length
           ? `${event.schedules.length} dates`
@@ -228,7 +161,7 @@ export function FlipCardBento({
       },
       {
         id: 'prizes',
-        number: '08',
+        number: '07',
         title: 'Prizes',
         countBadge: event?.prizes?.length ? `${event.prizes.length} tiers` : 'Tiers',
         desktopSpan: 'lg:col-span-2',
@@ -236,7 +169,7 @@ export function FlipCardBento({
       },
       {
         id: 'faqs',
-        number: '09',
+        number: '08',
         title: 'FAQs',
         countBadge: event?.faqs?.length ? `${event.faqs.length} FAQs` : 'FAQs',
         desktopSpan: 'lg:col-span-1',
@@ -244,7 +177,7 @@ export function FlipCardBento({
       },
       {
         id: 'gallery',
-        number: '10',
+        number: '09',
         title: 'Gallery',
         countBadge: event?.gallery_images?.length ? `${event.gallery_images.length} photos` : 'Photos',
         desktopSpan: 'lg:col-span-2',
@@ -252,7 +185,7 @@ export function FlipCardBento({
       },
       {
         id: 'contact',
-        number: '11',
+        number: '10',
         title: 'Contact',
         countBadge:
           (event?.organizers?.length || 0) + (event?.coordinators?.length || 0) > 0
@@ -276,7 +209,6 @@ export function FlipCardBento({
   }, [event, isDetailLoading])
 
   // Start condition: cards data loaded (not skeleton) AND >= 25% in view AND shutter ready
-  // If section already in view when shutter finishes, start 150ms after that.
   useEffect(() => {
     if (hasTriggeredRef.current) return
     if (isDetailLoading || cards.length === 0) return
@@ -318,165 +250,251 @@ export function FlipCardBento({
     return () => clearTimeout(timer)
   }, [isDetailLoading, cards.length, isInView, isShutterReady, willRunFull, prefersReduced])
 
-  // FLIP MECHANICS: Performance-safe two-phase rotateY with explicit state machine per card
-  // Phase 1: 0 to 90deg (0.32s, soft ease), swap front for back
-  // Phase 2: -90 to 0deg (0.42s, soft ease)
-  const flipCardToBack = useCallback(
+  // THE SURPRISE: "ticket punch"
+  // When flip settles, pop Volt diamond chip (arcs up 28px, falls with gravity, 0.9s).
+  // "PUNCHED" stamp slams onto back face corner (0.15s scale 1.4 to 1 + 3px card shake).
+  // Plays once per flip, only on first flip of each card in session.
+  const triggerTicketPunch = useCallback(
     (cardId: string) => {
-      if (isDetailLoading) return
-      const currentPhase = cardPhases[cardId] || 'front'
-      if (currentPhase === 'back' || currentPhase === 'toBack') return
-
-      // If another card is flipped, flip it back immediately without animation
-      if (activeFlippedCardId && activeFlippedCardId !== cardId) {
-        const prevCard = cardRefs.current[activeFlippedCardId]
-        if (prevCard) {
-          prevCard.style.transition = 'none'
-          prevCard.style.transform = 'rotateY(0deg)'
-          prevCard.style.willChange = 'auto'
-        }
-        setCardPhases((prev) => ({ ...prev, [activeFlippedCardId]: 'front' }))
-      }
-
-      setActiveFlippedCardId(cardId)
-      window.history.replaceState(null, '', `#${cardId}`)
-
-      // Lite mode or reduced motion: 150ms cross-fade
-      if (prefersReduced || isLite) {
-        setCardPhases((prev) => ({ ...prev, [cardId]: 'back' }))
-        setTimeout(() => {
-          backHeadingRefs.current[cardId]?.focus()
-        }, scaleMs(150))
-        return
-      }
+      if (isLite || prefersReduced) return
+      if (punchedCardsRef.current.has(cardId)) return
+      punchedCardsRef.current.add(cardId)
 
       const cardEl = cardRefs.current[cardId]
       if (!cardEl) return
 
-      // Flake burst on open (8 tiny volt flakes)
-      triggerFlakeBurst(cardEl, 'open')
+      // 1. Single small Volt diamond chip popping from top edge
+      const chip = document.createElement('div')
+      chip.className = 'ticket-punch-chip pointer-events-none absolute z-50'
+      chip.style.width = '10px'
+      chip.style.height = '10px'
+      chip.style.backgroundColor = '#D4FF3F'
+      chip.style.transform = 'rotate(45deg)'
+      chip.style.left = '48%'
+      chip.style.top = '0px'
+      cardEl.appendChild(chip)
 
-      setCardPhases((prev) => ({ ...prev, [cardId]: 'toBack' }))
-      setAnimatingCardId(cardId)
-      cardEl.style.willChange = 'transform'
+      const punchTl = gsap.timeline({
+        onComplete: () => {
+          chip.remove()
+        },
+      })
 
-      const phase1Ms = scaleMs(320) // 0.32s
-      const phase2Ms = scaleMs(420) // 0.42s
+      punchTl.to(chip, {
+        y: -28,
+        x: 10,
+        rotation: 75,
+        duration: 0.38 * MOTION_SCALE,
+        ease: 'power1.out',
+      })
+      punchTl.to(chip, {
+        y: 45,
+        x: 20,
+        rotation: 140,
+        opacity: 0,
+        duration: 0.52 * MOTION_SCALE,
+        ease: 'power2.in',
+      })
 
-      // Phase 1: 0 -> 90deg (0.32s, soft ease)
-      cardEl.style.transition = `transform ${phase1Ms}ms ${MOTION.flip.cssEase}`
-      cardEl.style.transform = 'rotateY(90deg)'
+      // 2. Mono "PUNCHED" stamp slams onto back face corner
+      const stampEl = cardEl.querySelector('.punched-stamp') as HTMLElement | null
+      if (stampEl) {
+        gsap.fromTo(
+          stampEl,
+          { scale: 1.4, opacity: 0, rotation: -6 },
+          { scale: 1, opacity: 1, rotation: -6, duration: 0.15 * MOTION_SCALE, ease: 'power4.in' }
+        )
+      }
 
-      setTimeout(() => {
-        try {
-          // Swap face to back while card is perpendicular
-          setCardPhases((prev) => ({ ...prev, [cardId]: 'back' }))
-          cardEl.style.transition = 'none'
-          cardEl.style.transform = 'rotateY(-90deg)'
-
-          // Force reflow
-          void cardEl.offsetWidth
-
-          // Phase 2: -90deg -> 0deg (0.42s, soft ease)
-          cardEl.style.transition = `transform ${phase2Ms}ms ${MOTION.flip.cssEase}`
-          cardEl.style.transform = 'rotateY(0deg)'
-
-          setTimeout(() => {
-            try {
-              cardEl.style.willChange = 'auto'
-              setAnimatingCardId(null)
-              backHeadingRefs.current[cardId]?.focus()
-            } finally {
-              setCardPhases((prev) => ({ ...prev, [cardId]: 'back' }))
-            }
-          }, phase2Ms + 10)
-        } catch {
-          setCardPhases((prev) => ({ ...prev, [cardId]: 'back' }))
-          setAnimatingCardId(null)
-          cardEl.style.transform = 'none'
-        }
-      }, phase1Ms)
+      // 3. 3px shake of the card
+      gsap.fromTo(
+        cardEl,
+        { x: 0 },
+        { x: 3, duration: 0.05 * MOTION_SCALE, yoyo: true, repeat: 3, ease: 'power1.inOut' }
+      )
     },
-    [isDetailLoading, activeFlippedCardId, cardPhases, prefersReduced, isLite]
+    [isLite, prefersReduced]
+  )
+
+  // FLIP MECHANICS: 1.1s duration, ease power3.inOut, lift scale 1.04 + deeper hard Volt shadow + sheen during rotation
+  const flipCardToBack = useCallback(
+    (cardId: string) => {
+      if (isDetailLoading) return
+      if (isFlipLockedRef.current) return
+      if (flippedId === cardId) return
+
+      // If another card is flipped, reset it immediately without animation
+      if (flippedId && flippedId !== cardId) {
+        const prevCard = cardRefs.current[flippedId]
+        if (prevCard) {
+          gsap.set(prevCard, { rotateY: 0, scale: 1, boxShadow: '0 0 0 transparent' })
+        }
+      }
+
+      isFlipLockedRef.current = true
+      if (lockTimerRef.current) clearTimeout(lockTimerRef.current)
+      lockTimerRef.current = setTimeout(() => {
+        isFlipLockedRef.current = false
+      }, 1500)
+
+      setFlippedId(cardId)
+      window.history.replaceState(null, '', `#${cardId}`)
+
+      const cardEl = cardRefs.current[cardId]
+      if (!cardEl) {
+        isFlipLockedRef.current = false
+        return
+      }
+
+      if (isLite || prefersReduced) {
+        gsap.set(cardEl, { rotateY: 180 })
+        isFlipLockedRef.current = false
+        setTimeout(() => {
+          backHeadingRefs.current[cardId]?.focus()
+        }, 50)
+        return
+      }
+
+      const sheenEl = cardEl.querySelector('.card-shiny-sheen')
+      const tl = gsap.timeline({
+        onComplete: () => {
+          isFlipLockedRef.current = false
+          backHeadingRefs.current[cardId]?.focus()
+          triggerTicketPunch(cardId)
+        },
+      })
+
+      // Lift: scale to 1.04 and deep hard Volt offset shadow
+      tl.to(
+        cardEl,
+        {
+          scale: 1.04,
+          boxShadow: '0 0 0 2px #D4FF3F, 8px 8px 0px #D4FF3F',
+          duration: 0.55 * MOTION_SCALE,
+          ease: 'power3.out',
+        },
+        0
+      )
+
+      // Rotate: 0 -> 180deg (1.1s, power3.inOut)
+      tl.to(
+        cardEl,
+        {
+          rotateY: 180,
+          duration: 1.1 * MOTION_SCALE,
+          ease: 'power3.inOut',
+        },
+        0
+      )
+
+      // Sheen sweeps across DURING rotation
+      if (sheenEl) {
+        tl.fromTo(
+          sheenEl,
+          { x: '-100%', opacity: 1 },
+          { x: '200%', opacity: 0, duration: 0.9 * MOTION_SCALE, ease: 'power2.inOut' },
+          0.1
+        )
+      }
+
+      // Settle back with tiny overshoot (0.25s)
+      tl.to(
+        cardEl,
+        {
+          scale: 1.0,
+          boxShadow: '0 0 0 0px transparent, 0px 0px 0px transparent',
+          duration: 0.25 * MOTION_SCALE,
+          ease: 'back.out(1.8)',
+        },
+        1.1 * MOTION_SCALE
+      )
+    },
+    [isDetailLoading, flippedId, isLite, prefersReduced, triggerTicketPunch]
   )
 
   const flipCardToFront = useCallback(
     (cardId: string) => {
-      const currentPhase = cardPhases[cardId] || 'front'
-      if (currentPhase === 'front' || currentPhase === 'toFront') return
+      if (isFlipLockedRef.current) return
 
-      setActiveFlippedCardId(null)
+      isFlipLockedRef.current = true
+      if (lockTimerRef.current) clearTimeout(lockTimerRef.current)
+      lockTimerRef.current = setTimeout(() => {
+        isFlipLockedRef.current = false
+      }, 1500)
 
-      if (prefersReduced || isLite) {
-        setCardPhases((prev) => ({ ...prev, [cardId]: 'front' }))
-        setTimeout(() => {
-          frontBtnRefs.current[cardId]?.focus()
-        }, scaleMs(150))
-        return
-      }
+      setFlippedId(null)
 
       const cardEl = cardRefs.current[cardId]
       if (!cardEl) {
-        setCardPhases((prev) => ({ ...prev, [cardId]: 'front' }))
+        isFlipLockedRef.current = false
         return
       }
 
-      // Lighter flake burst on flipping back
-      triggerFlakeBurst(cardEl, 'close')
+      if (isLite || prefersReduced) {
+        gsap.set(cardEl, { rotateY: 0 })
+        isFlipLockedRef.current = false
+        setTimeout(() => {
+          frontBtnRefs.current[cardId]?.focus()
+        }, 50)
+        return
+      }
 
-      setCardPhases((prev) => ({ ...prev, [cardId]: 'toFront' }))
-      setAnimatingCardId(cardId)
-      cardEl.style.willChange = 'transform'
+      const tl = gsap.timeline({
+        onComplete: () => {
+          isFlipLockedRef.current = false
+          frontBtnRefs.current[cardId]?.focus()
+        },
+      })
 
-      const phase1Ms = scaleMs(320) // 0.32s
-      const phase2Ms = scaleMs(420) // 0.42s
+      // Lift: scale to 1.04 and Volt shadow
+      tl.to(
+        cardEl,
+        {
+          scale: 1.04,
+          boxShadow: '0 0 0 2px #D4FF3F, 8px 8px 0px #D4FF3F',
+          duration: 0.55 * MOTION_SCALE,
+          ease: 'power3.out',
+        },
+        0
+      )
 
-      // Reverse Phase 1: 0 -> -90deg (0.32s, soft ease)
-      cardEl.style.transition = `transform ${phase1Ms}ms ${MOTION.flip.cssEase}`
-      cardEl.style.transform = 'rotateY(-90deg)'
+      // Rotate: 180 -> 0deg (1.1s, power3.inOut)
+      tl.to(
+        cardEl,
+        {
+          rotateY: 0,
+          duration: 1.1 * MOTION_SCALE,
+          ease: 'power3.inOut',
+        },
+        0
+      )
 
-      setTimeout(() => {
-        try {
-          // Swap face to front while perpendicular
-          setCardPhases((prev) => ({ ...prev, [cardId]: 'front' }))
-          cardEl.style.transition = 'none'
-          cardEl.style.transform = 'rotateY(90deg)'
-
-          void cardEl.offsetWidth
-
-          // Reverse Phase 2: 90deg -> 0deg (0.42s, soft ease)
-          cardEl.style.transition = `transform ${phase2Ms}ms ${MOTION.flip.cssEase}`
-          cardEl.style.transform = 'rotateY(0deg)'
-
-          setTimeout(() => {
-            try {
-              cardEl.style.willChange = 'auto'
-              setAnimatingCardId(null)
-              frontBtnRefs.current[cardId]?.focus()
-            } finally {
-              setCardPhases((prev) => ({ ...prev, [cardId]: 'front' }))
-            }
-          }, phase2Ms + 10)
-        } catch {
-          setCardPhases((prev) => ({ ...prev, [cardId]: 'front' }))
-          setAnimatingCardId(null)
-          cardEl.style.transform = 'none'
-        }
-      }, phase1Ms)
+      // Settle back with tiny overshoot at end (0.25s)
+      tl.to(
+        cardEl,
+        {
+          scale: 1.0,
+          boxShadow: '0 0 0 0px transparent, 0px 0px 0px transparent',
+          duration: 0.25 * MOTION_SCALE,
+          ease: 'back.out(1.8)',
+        },
+        1.1 * MOTION_SCALE
+      )
     },
-    [cardPhases, prefersReduced, isLite]
+    [isLite, prefersReduced]
   )
 
   // Esc key flips back the currently flipped card
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && activeFlippedCardId) {
-        flipCardToFront(activeFlippedCardId)
+      if (e.key === 'Escape' && flippedId && !isFlipLockedRef.current) {
+        e.preventDefault()
+        flipCardToFront(flippedId)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeFlippedCardId, flipCardToFront])
+  }, [flippedId, flipCardToFront])
 
   // Listen to global route exit event: clean up timeline and flip back without animating
   useEffect(() => {
@@ -485,14 +503,11 @@ export function FlipCardBento({
         cancelSequenceRef.current()
         cancelSequenceRef.current = null
       }
-      setActiveFlippedCardId(null)
-      setCardPhases({})
-      setAnimatingCardId(null)
+      setFlippedId(null)
+      isFlipLockedRef.current = false
       Object.values(cardRefs.current).forEach((el) => {
         if (el) {
-          el.style.transition = 'none'
-          el.style.transform = 'none'
-          el.style.willChange = 'auto'
+          gsap.set(el, { rotateY: 0, scale: 1, boxShadow: 'none' })
         }
       })
     }
@@ -558,7 +573,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('overview', cardRefs.current['overview'])
+                  onOpenFull('overview', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt font-mono text-xs uppercase font-black hover:underline"
               >
@@ -591,7 +606,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('highlights', cardRefs.current['highlights'])
+                  onOpenFull('highlights', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -624,40 +639,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('expect', cardRefs.current['expect'])
-                }}
-                className="text-volt uppercase font-black hover:underline"
-              >
-                Open full →
-              </button>
-            </div>
-          </div>
-        )
-      }
-
-      case 'eligibility': {
-        const items = event?.eligibility || []
-        const previewItems = items.slice(0, 3)
-        const hasMore = items.length > 3
-        return (
-          <div className="flex flex-col justify-between h-full p-4 sm:p-5 select-none space-y-2.5">
-            <div className="space-y-1.5 flex-1">
-              {previewItems.map((item, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs text-bone/85">
-                  <span className="font-mono text-volt font-bold">✓</span>
-                  <span className="line-clamp-1">{item}</span>
-                </div>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-bone/15 flex items-center justify-between font-mono text-xs">
-              <span className="text-bone/50 text-[11px]">
-                {hasMore ? `+${items.length - 3} more` : `${items.length} criteria`}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFull('eligibility', cardRefs.current['eligibility'])
+                  onOpenFull('expect', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -690,7 +672,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('prerequisites', cardRefs.current['prerequisites'])
+                  onOpenFull('prerequisites', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -725,7 +707,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('rules', cardRefs.current['rules'])
+                  onOpenFull('rules', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -770,7 +752,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('schedule', cardRefs.current['schedule'])
+                  onOpenFull('schedule', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -804,7 +786,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('prizes', cardRefs.current['prizes'])
+                  onOpenFull('prizes', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -834,7 +816,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('faqs', cardRefs.current['faqs'])
+                  onOpenFull('faqs', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -863,7 +845,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('gallery', cardRefs.current['gallery'])
+                  onOpenFull('gallery', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -906,7 +888,7 @@ export function FlipCardBento({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onOpenFull('contact', cardRefs.current['contact'])
+                  onOpenFull('contact', e.currentTarget as HTMLElement)
                 }}
                 className="text-volt uppercase font-black hover:underline"
               >
@@ -982,8 +964,7 @@ export function FlipCardBento({
         className="flip-grid-wrapper relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 select-none"
       >
         {cards.map((card) => {
-          const phase = cardPhases[card.id] || 'front'
-          const isFlipped = phase === 'back' || phase === 'toFront'
+          const isFlipped = flippedId === card.id
 
           return (
             <motion.div
@@ -1003,6 +984,7 @@ export function FlipCardBento({
                 }
               }}
               className={`flip-card-item relative ${card.desktopSpan} min-h-[190px] flex`}
+              style={{ perspective: 1200 }}
             >
               <div
                 ref={(el) => {
@@ -1010,7 +992,7 @@ export function FlipCardBento({
                 }}
                 className="w-full h-full relative"
                 style={{
-                  transformStyle: animatingCardId === card.id ? 'preserve-3d' : 'flat',
+                  transformStyle: 'preserve-3d',
                 }}
               >
                 {/* FRONT FACE: Heading alone, big and bold, number, tiny count badge, small flip icon */}
@@ -1027,8 +1009,12 @@ export function FlipCardBento({
                   tabIndex={isFlipped ? -1 : 0}
                   onClick={() => flipCardToBack(card.id)}
                   disabled={isDetailLoading}
+                  style={{
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                  }}
                   className={`flip-card-front absolute inset-0 w-full h-full text-left p-5 sm:p-6 border-2 border-bone/25 bg-[#111210] flex flex-col justify-between overflow-hidden clip-chamfer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt group cursor-pointer ${
-                    isFlipped ? 'pointer-events-none opacity-0 invisible' : 'pointer-events-auto opacity-100 visible'
+                    isFlipped ? 'pointer-events-none' : 'pointer-events-auto'
                   }`}
                 >
                   {/* Shiny Sheen Pseudo-Element (Desktop hover) */}
@@ -1066,16 +1052,21 @@ export function FlipCardBento({
                   </div>
                 </button>
 
-                {/* BACK FACE: Same footprint, no scrolling, "Flip back" button. Clicking area flips back. */}
+                {/* BACK FACE: Same footprint, no scrolling, "BACK" button. Clicking non-interactive area flips back. */}
                 <div
                   aria-hidden={!isFlipped}
                   inert={!isFlipped}
                   onClick={() => flipCardToFront(card.id)}
+                  style={{
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                    transform: 'rotateY(180deg)',
+                  }}
                   className={`flip-card-back absolute inset-0 w-full h-full border-2 border-bone/35 bg-[#161715] flex flex-col justify-between overflow-hidden clip-chamfer cursor-pointer ${
-                    !isFlipped ? 'pointer-events-none opacity-0 invisible' : 'pointer-events-auto opacity-100 visible'
+                    !isFlipped ? 'pointer-events-none' : 'pointer-events-auto'
                   }`}
                 >
-                  {/* Back Face Header with Title and Dedicated "Flip back" Button */}
+                  {/* Back Face Header with Title and Dedicated Chamfered "BACK" Button */}
                   <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-bone/15 bg-bone/[0.03]">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs text-volt font-black">{card.number}</span>
@@ -1090,7 +1081,7 @@ export function FlipCardBento({
                       </h4>
                     </div>
 
-                    {/* Dedicated Flip Back Button */}
+                    {/* Dedicated Chamfered "BACK" Button */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1098,16 +1089,27 @@ export function FlipCardBento({
                         flipCardToFront(card.id)
                       }}
                       aria-label={`Flip ${card.title} card back to front`}
-                      className="px-2.5 py-1 text-bone/60 hover:text-volt border border-bone/20 hover:border-volt/40 font-mono text-[10px] uppercase font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt flex items-center gap-1 cursor-pointer"
+                      className="clip-chamfer px-3 py-1 bg-volt text-ink hover:bg-bone font-mono text-xs uppercase font-black tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
-                      <span>⤾</span>
-                      <span>Flip back</span>
+                      <span className="text-[10px]">⤾</span>
+                      <span>BACK</span>
                     </button>
                   </div>
 
                   {/* Back Content Preview (No scrolling inside card) */}
                   <div className="flex-1 min-h-0 overflow-hidden">
                     {renderBackPreview(card.id)}
+                  </div>
+
+                  {/* Mono "PUNCHED" stamp corner stamp */}
+                  <div
+                    aria-hidden="true"
+                    className={`punched-stamp pointer-events-none absolute bottom-3 right-3 border border-volt text-volt font-mono text-[10px] uppercase font-black px-2 py-0.5 tracking-widest z-20 ${
+                      punchedCardsRef.current.has(card.id) ? 'opacity-90' : 'opacity-0'
+                    }`}
+                    style={{ transform: 'rotate(-6deg)' }}
+                  >
+                    PUNCHED
                   </div>
                 </div>
               </div>

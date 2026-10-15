@@ -196,26 +196,27 @@ export function Navbar() {
         Skip to main content
       </a>
 
-      {/* Floating Centered Chamfered Bar Navbar (Solid Ink background to avoid clash) */}
-      <header
-        role="banner"
-        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-[900px] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          shouldHide ? '-translate-y-28 opacity-0' : 'translate-y-0 opacity-100'
-        }`}
-      >
+      {/* Full-width fixed wrapper for rock-solid flex centering (zero transform horizontal dependency) */}
+      <div className="fixed top-4 left-0 right-0 z-50 flex justify-center pointer-events-none px-2 sm:px-4">
+        <header
+          role="banner"
+          className={`pointer-events-auto w-full max-w-[880px] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            shouldHide ? '-translate-y-28 opacity-0' : 'translate-y-0 opacity-100'
+          }`}
+        >
         {/* Solid Ink background (~90% opacity) so page content never shows through and clashes */}
-        <div className="relative bg-[#111210]/92 backdrop-blur-md clip-chamfer border-2 border-bone/20 px-3 py-2 sm:px-5 sm:py-2.5 shadow-2xl">
+        <div className="relative bg-[#111210]/92 backdrop-blur-md clip-chamfer border-2 border-bone/20 px-2.5 py-1.5 sm:px-5 sm:py-2.5 shadow-2xl">
           <nav
             aria-label="Main Navigation"
-            className="flex items-center justify-between gap-2 sm:gap-4"
+            className="flex items-center justify-between gap-1.5 sm:gap-4"
           >
             {/* Wordmark (Left) */}
             <Link
               to="/"
-              className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt px-1 py-0.5 group shrink-0"
+              className="flex items-center gap-1.5 sm:gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-volt px-1 py-0.5 group shrink-0"
             >
               <span className="w-2 h-2 bg-volt shrink-0 rotate-45" />
-              <span className="font-display text-xl sm:text-2xl font-black text-bone tracking-tight uppercase group-hover:text-volt transition-colors">
+              <span className="font-display text-lg sm:text-2xl font-black text-bone tracking-tight uppercase group-hover:text-volt transition-colors">
                 OFFSCRIPT
               </span>
             </Link>
@@ -242,7 +243,7 @@ export function Navbar() {
             </div>
 
             {/* Right Side: Chamfered Register Button + Mobile Toggle */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               <Button
                 variant="primary"
                 size="sm"
@@ -250,7 +251,7 @@ export function Navbar() {
                 target="_blank"
                 rel="noreferrer"
                 cursorLabel="Register"
-                className="shadow-none px-3.5 py-1.5 text-xs font-bold font-mono tracking-wider"
+                className="shadow-none px-2.5 py-1 text-[11px] sm:px-3.5 sm:py-1.5 sm:text-xs font-bold font-mono tracking-wider"
               >
                 Register
               </Button>
@@ -291,6 +292,7 @@ export function Navbar() {
           </div>
         </div>
       </header>
+    </div>
 
       {/* Full-Screen Mobile Menu with Clip-Path Reveal */}
       <AnimatePresence>

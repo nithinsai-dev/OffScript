@@ -80,7 +80,7 @@ function FeaturedCardItem({ event, idx }: { event: Event; idx: number }) {
         tearOnHover={true}
         stubContent={stub}
         stubWidth={170}
-        className="w-full shadow-2xl"
+        className="featured-ticket-card w-full shadow-2xl"
       >
         <div className="relative min-h-[280px] sm:min-h-[320px] flex flex-col justify-between overflow-hidden">
           {/* Diagonal Volt Scanline Sweep on Hover */}
@@ -179,12 +179,14 @@ export function FeaturedStack({ events }: FeaturedStackProps) {
         {/* Section Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b-2 border-bone/15 pb-6">
           <div className="space-y-1">
-            <span className="font-mono text-xs uppercase tracking-widest text-volt font-bold block">
+            <span data-reveal="eyebrow" className="font-mono text-xs uppercase tracking-widest text-volt font-bold block">
               CURATED SELECTION
             </span>
-            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-black uppercase text-bone tracking-tight">
-              Featured Campus Passes
-            </h2>
+            <div className="overflow-hidden">
+              <h2 data-reveal="heading" className="font-display text-3xl sm:text-4xl md:text-5xl font-black uppercase text-bone tracking-tight">
+                Featured Campus Passes
+              </h2>
+            </div>
           </div>
           <p className="font-sans text-xs sm:text-sm text-bone/60 max-w-xs">
             The headline passes students are booking this week.

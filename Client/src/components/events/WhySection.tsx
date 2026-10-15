@@ -159,7 +159,7 @@ export function WhySection() {
                   animate={{ scale: 1, opacity: 1, rotate: -4 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ type: 'spring', damping: 18, stiffness: 450 }}
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none"
+                  className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
                 >
                   <Stamp variant="volt" rotate={-4} className="text-base py-2 px-4 shadow-hard-bone">
                     ADMIT ONE PASS

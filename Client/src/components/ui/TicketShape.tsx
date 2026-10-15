@@ -46,7 +46,7 @@ function generateTicketPath(W: number, H: number, P: number, isMobile: boolean):
       L ${R_corner} ${H}
       A ${R_corner} ${R_corner} 0 0 0 0 ${H - R_corner}
       L 0 ${P + R_perf}
-      A ${R_perf} ${R_perf} 0 0 0 0 ${P - R_perf}
+      A ${R_perf} ${R_perf} 0 0 1 0 ${P - R_perf}
       L 0 ${R_corner}
       A ${R_corner} ${R_corner} 0 0 0 ${R_corner} 0
       Z
@@ -74,26 +74,6 @@ function generateTicketPath(W: number, H: number, P: number, isMobile: boolean):
 
   pathCache.set(key, path)
   return path
-}
-
-/**
- * Global Shared ResizeObserver singleton to avoid 1 observer per card
- */
-type ResizeCallback = (entry: ResizeObserverEntry) => void
-const observerCallbacks = new Map<Element, ResizeCallback>()
-let sharedRO: ResizeObserver | null = null
-
-function getSharedRO() {
-  if (typeof window === 'undefined') return null
-  if (!sharedRO) {
-    sharedRO = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const cb = observerCallbacks.get(entry.target)
-        if (cb) cb(entry)
-      }
-    })
-  }
-  return sharedRO
 }
 
 /**
@@ -130,11 +110,11 @@ export function TicketBarcode({ id = 'OFFSCRIPT', className = '' }: { id?: strin
 /**
  * Reusable TicketShape Component
  * Features:
+ * - Single source of truth for silhouette, border, stub divider, and perforation
  * - Concave quarter-circle scooped corners
- * - Semicircle notches at perforation line (top/bottom) and outer edge centers (left/right)
- * - Exact SVG outline stroke and fill
- * - Detachable stub on right (desktop) with tear tilt ONLY IF tearOnHover === true (FeaturedStack)
- * - Shared ResizeObserver and memoized SVG paths
+ * - Semicircle notches precisely aligned at perforation line
+ * - Detachable stub on right (desktop) with tear tilt ONLY IF tearOnHover === true
+ * - Synchronous initial layout measurement + ResizeObserver + fonts.ready + img load listeners
  */
 export function TicketShape({
   id = 'pass-01',
@@ -142,7 +122,7 @@ export function TicketShape({
   stubContent,
   overlayContent,
   className = '',
-  stubWidth = 130,
+  stubWidth = 170,
   isHovered: externalHover,
   tearOnHover = false,
   hoverStroke = true,
@@ -157,39 +137,53 @@ export function TicketShape({
 
   const isHovered = externalHover !== undefined ? externalHover : internalHover
 
+  // Synchronous layout effect on mount to avoid initial 360x480 flash or scaling desync
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
 
     const updateDimensions = () => {
-      const rect = el.getBoundingClientRect()
-      if (rect.width > 0 && rect.height > 0) {
-        const roundedW = Math.round(rect.width)
-        const roundedH = Math.round(rect.height)
-        setDimensions((prev) => (prev.width === roundedW && prev.height === roundedH ? prev : { width: roundedW, height: roundedH }))
+      const w = Math.round(el.offsetWidth)
+      const h = Math.round(el.offsetHeight)
+      const mobile = window.innerWidth < 640
+      setIsMobile(mobile)
+      if (w > 0 && h > 0) {
+        setDimensions((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }))
       }
-      setIsMobile(window.innerWidth < 640)
     }
 
     updateDimensions()
-    const ro = getSharedRO()
-    if (ro) {
-      observerCallbacks.set(el, updateDimensions)
-      ro.observe(el)
+
+    const ro = new ResizeObserver(() => {
+      updateDimensions()
+    })
+    ro.observe(el)
+
+    window.addEventListener('resize', updateDimensions, { passive: true })
+
+    if (typeof document !== 'undefined' && 'fonts' in document) {
+      document.fonts.ready.then(updateDimensions)
     }
 
-    return () => {
-      if (ro) {
-        observerCallbacks.delete(el)
-        ro.unobserve(el)
+    const images = el.querySelectorAll('img')
+    images.forEach((img) => {
+      if (!img.complete) {
+        img.addEventListener('load', updateDimensions, { once: true })
       }
+    })
+
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updateDimensions)
     }
   }, [])
 
   const { width: W, height: H } = dimensions
 
-  // On desktop, stub is on right; on mobile, stub is at bottom
-  const P = isMobile ? Math.max(120, H - 110) : Math.max(140, W - stubWidth)
+  // Desktop: stub is right column of width `stubWidth`. Perforation is at `W - stubWidth`.
+  // Mobile: stub is bottom row of height 110px. Perforation is at `H - 110`.
+  const stubHeight = 110
+  const P = isMobile ? Math.max(80, H - stubHeight) : Math.max(120, W - stubWidth)
 
   const ticketPath = generateTicketPath(W, H, P, isMobile)
 
@@ -210,14 +204,20 @@ export function TicketShape({
       ref={containerRef}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
+      style={{
+        // Define stub width CSS variable as single source of truth
+        ['--stub-w' as string]: `${stubWidth}px`,
+        ['--stub-h' as string]: `${stubHeight}px`,
+      }}
       className={`relative group select-none ${className}`}
     >
-      {/* SVG Outline and Background Silhouette */}
+      {/* SVG Outline and Background Silhouette - exact box match */}
       <svg
-        className="absolute inset-0 w-full h-full pointer-events-none z-0"
+        className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
         width={W}
         height={H}
         viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
         fill="none"
       >
         <defs>
@@ -236,28 +236,30 @@ export function TicketShape({
           className="transition-colors duration-200"
         />
 
-        {/* SVG Punch Hole Perforation Line */}
+        {/* SVG Punch Hole Perforation Line - sits exactly on stub boundary */}
         {isMobile ? (
           <line
+            className="ticket-perforation"
             x1="12"
             y1={P}
             x2={W - 12}
             y2={P}
             stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
             strokeWidth="2"
-            strokeDasharray="1 6"
+            strokeDasharray="2 6"
             strokeLinecap="round"
             strokeOpacity="0.45"
           />
         ) : (
           <line
+            className="ticket-perforation"
             x1={P}
             y1="12"
             x2={P}
             y2={H - 12}
             stroke={hoverStroke && isHovered ? '#D4FF3F' : '#EDEBE0'}
             strokeWidth="2"
-            strokeDasharray="1 6"
+            strokeDasharray="2 6"
             strokeLinecap="round"
             strokeOpacity="0.45"
           />
@@ -271,8 +273,8 @@ export function TicketShape({
       >
         {overlayContent}
 
-        {/* Main Body */}
-        <div className="flex-1 flex flex-col min-w-0 p-4 sm:p-5 relative z-10">
+        {/* Main Body - content padding larger than scoop radius so nothing crosses outline */}
+        <div className="featured-ticket-content flex-1 flex flex-col min-w-0 p-6 sm:p-7 relative z-10">
           {children}
         </div>
 
@@ -282,7 +284,7 @@ export function TicketShape({
             aria-hidden="true"
             className="absolute z-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
             style={{
-              right: `${stubWidth - 14}px`,
+              right: 'calc(var(--stub-w) - 14px)',
               top: '50%',
               transform: 'translateY(-50%)',
             }}
@@ -305,11 +307,12 @@ export function TicketShape({
             }
             transition={{ type: 'spring', damping: 22, stiffness: 350 }}
             style={{
-              width: isMobile ? '100%' : `${stubWidth}px`,
+              width: isMobile ? '100%' : 'var(--stub-w)',
+              height: isMobile ? 'var(--stub-h)' : '100%',
               borderLeft: isMobile ? 'none' : '1px solid rgba(237,235,224,0.1)',
               borderTop: isMobile ? '1px solid rgba(237,235,224,0.1)' : 'none',
             }}
-            className="shrink-0 bg-bone/[0.02] p-3 sm:p-4 flex flex-col justify-between items-center text-center relative z-10"
+            className="featured-stub-column shrink-0 bg-bone/[0.02] p-4 sm:p-5 flex flex-col justify-between items-center text-center relative z-10"
           >
             {stubContent}
           </motion.div>
