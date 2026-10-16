@@ -5,7 +5,6 @@ import {
   lazyRouteComponent,
 } from '@tanstack/react-router'
 import { RootLayout } from '@/routes/root'
-import { LandingPage } from '@/routes/landing'
 import { NotFoundComponent } from '@/routes/not-found'
 import { RouteErrorComponent } from '@/routes/error'
 
@@ -16,11 +15,18 @@ const rootRoute = createRootRoute({
   errorComponent: RouteErrorComponent,
 })
 
+import { queryClient } from '@/app/queryClient'
+import { eventsQueryOptions, eventDetailQueryOptions } from '@/features/events/queries'
+
 // 2. Landing index route (/)
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: LandingPage,
+  loader: () => queryClient.prefetchQuery(eventsQueryOptions()),
+  component: lazyRouteComponent(
+    () => import('@/routes/landing'),
+    'LandingPage'
+  ),
 })
 
 export interface EventsSearchSchema {
@@ -35,6 +41,7 @@ export interface EventsSearchSchema {
 const eventsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/events',
+  loader: () => queryClient.prefetchQuery(eventsQueryOptions()),
   validateSearch: (search: Record<string, unknown>): EventsSearchSchema => {
     return {
       q: typeof search.q === 'string' && search.q ? search.q : undefined,
@@ -54,6 +61,7 @@ const eventsRoute = createRoute({
 const eventDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/events/$eventId',
+  loader: ({ params }) => queryClient.prefetchQuery(eventDetailQueryOptions(params.eventId)),
   component: lazyRouteComponent(
     () => import('@/routes/event-detail'),
     'EventDetailPage'

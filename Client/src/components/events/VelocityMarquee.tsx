@@ -24,7 +24,7 @@ export function VelocityMarquee() {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const isVisibleRef = useRef(true)
 
-  // Pause offscreen via IntersectionObserver (Target #12 & #13)
+  // Pause offscreen via IntersectionObserver
   useEffect(() => {
     const el = wrapperRef.current
     if (!el) return
@@ -34,6 +34,7 @@ export function VelocityMarquee() {
         isVisibleRef.current = entry.isIntersecting
         if (trackRef.current) {
           trackRef.current.style.animationPlayState = entry.isIntersecting ? 'running' : 'paused'
+          trackRef.current.style.willChange = entry.isIntersecting ? 'transform' : 'auto'
         }
       },
       { rootMargin: '100px' }
@@ -43,28 +44,33 @@ export function VelocityMarquee() {
     return () => observer.disconnect()
   }, [])
 
-  // Apply velocity skew only when scrolling
+  // Apply velocity skew event-driven on scroll, NEVER in a continuous rAF loop (P5)
   useEffect(() => {
-    if (prefersReduced) return
+    const isLite = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf') === 'lite'
+    if (prefersReduced || isLite) return
 
-    let rafId: number | null = null
+    let resetTimer: ReturnType<typeof setTimeout> | null = null
 
-    const checkVelocity = () => {
-      if (isVisibleRef.current && trackRef.current) {
-        const vel = getVelocity()
-        if (Math.abs(vel) > 0.1) {
-          const skew = Math.max(-4, Math.min(4, -vel * 0.3))
-          trackRef.current.style.transform = `skewX(${skew}deg)`
-        } else {
+    const handleScroll = () => {
+      if (!isVisibleRef.current || !trackRef.current) return
+      const vel = getVelocity()
+      if (Math.abs(vel) > 0.1) {
+        const skew = Math.max(-4, Math.min(4, -vel * 0.3))
+        trackRef.current.style.transform = `skewX(${skew}deg)`
+      }
+
+      if (resetTimer) clearTimeout(resetTimer)
+      resetTimer = setTimeout(() => {
+        if (trackRef.current) {
           trackRef.current.style.transform = 'skewX(0deg)'
         }
-      }
-      rafId = requestAnimationFrame(checkVelocity)
+      }, 120)
     }
 
-    rafId = requestAnimationFrame(checkVelocity)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
-      if (rafId) cancelAnimationFrame(rafId)
+      window.removeEventListener('scroll', handleScroll)
+      if (resetTimer) clearTimeout(resetTimer)
     }
   }, [getVelocity, prefersReduced])
 

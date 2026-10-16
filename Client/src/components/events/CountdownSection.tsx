@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useCountdown } from '@/hooks/useCountdown'
-import { Button } from '@/components/ui/Button'
-import { REGISTRATION_URL_BASE } from '@/lib/config'
+import { RegisterButton } from '@/components/ui/RegisterButton'
 import type { Event } from '@/types/event'
 
 export const FILL_WINDOW_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -192,17 +191,15 @@ export function CountdownSection({ events }: CountdownSectionProps) {
       {/* Action CTA & Fill Status Indicator */}
       <div className="pt-2 flex flex-col sm:flex-row justify-center items-center gap-4">
         {nearestTarget && (
-          <Button
-            variant={isInverted ? 'secondary' : 'primary'}
+          <RegisterButton
+            event={nearestTarget.event}
+            variant={isInverted ? 'outline' : 'chamfered'}
             size="lg"
-            href={`${REGISTRATION_URL_BASE}?eventId=${encodeURIComponent(nearestTarget.event.id)}`}
-            target="_blank"
-            rel="noreferrer"
             cursorLabel="Register"
             className={isInverted ? 'bg-ink text-volt border-ink hover:bg-ink/90' : ''}
           >
             Register Before Close
-          </Button>
+          </RegisterButton>
         )}
 
         <div

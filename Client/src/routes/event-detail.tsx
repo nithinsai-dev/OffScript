@@ -3,7 +3,6 @@ import { useParams, Link, useRouter } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { Badge } from '@/components/ui/Badge'
 import { Stamp } from '@/components/ui/Stamp'
-import { Button } from '@/components/ui/Button'
 import { TicketShape, TicketBarcode } from '@/components/ui/TicketShape'
 import { SeatsBar } from '@/components/events/SeatsBar'
 import { SplitText } from '@/components/effects/SplitText'
@@ -24,7 +23,7 @@ import {
   formatTeamSize,
 } from '@/lib/formatters'
 import { FALLBACK_COVER_IMAGE } from '@/lib/schemas'
-import { REGISTRATION_URL_BASE } from '@/lib/config'
+import { RegisterButton } from '@/components/ui/RegisterButton'
 import type { EventDetail } from '@/types/event'
 
 export function EventDetailPage() {
@@ -81,7 +80,6 @@ export function EventDetailPage() {
   const event: EventDetail | null = detailEvent || cachedSummary
 
   const [imageError, setImageError] = useState(false)
-  const [shakeDisabled, setShakeDisabled] = useState(false)
   const [openFullCardId, setOpenFullCardId] = useState<string | null>(null)
   const [originatingElement, setOriginatingElement] = useState<HTMLElement | null>(null)
   const [isEligibilityExpanded, setIsEligibilityExpanded] = useState(false)
@@ -123,11 +121,6 @@ export function EventDetailPage() {
       document.title = 'OFFSCRIPT — #beoffscript | Event Discovery Platform'
     }
   }, [event?.name, event?.blurb])
-
-  const handleDisabledClick = () => {
-    setShakeDisabled(true)
-    setTimeout(() => setShakeDisabled(false), 500)
-  }
 
   // Related events calculation
   const relatedEvents = useMemo(() => {
@@ -260,8 +253,6 @@ export function EventDetailPage() {
 
   if (!event) return null
 
-  const isRegistrationOpen = event.registration_status === 'OPEN'
-  const registrationHref = `${REGISTRATION_URL_BASE}?eventId=${encodeURIComponent(event.id)}`
   const rawHeroImage = imageError
     ? FALLBACK_COVER_IMAGE
     : event.banner_image_url || event.cover_image_url || FALLBACK_COVER_IMAGE
@@ -455,29 +446,15 @@ export function EventDetailPage() {
 
         {/* Register CTA Button */}
         <div className="pt-2">
-          {isRegistrationOpen ? (
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              href={registrationHref}
-              target="_blank"
-              rel="noreferrer"
-              cursorLabel="Register"
-            >
-              Register Now
-            </Button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleDisabledClick}
-              className={`w-full py-3.5 px-4 border-2 border-bone/30 bg-bone/5 text-bone/50 font-mono text-xs uppercase font-bold tracking-wider cursor-not-allowed ${
-                shakeDisabled ? 'animate-shake' : ''
-              }`}
-            >
-              Registration Closed
-            </button>
-          )}
+          <RegisterButton
+            event={event}
+            variant="chamfered"
+            size="lg"
+            fullWidth
+            cursorLabel="Register"
+          >
+            Register Now
+          </RegisterButton>
         </div>
       </div>
     </TicketShape>
@@ -689,27 +666,15 @@ export function EventDetailPage() {
               </span>
             </div>
 
-            {isRegistrationOpen ? (
-              <Button
-                variant="primary"
-                size="sm"
-                href={registrationHref}
-                target="_blank"
-                rel="noreferrer"
-                cursorLabel="Register"
-                className="py-2 px-4 text-xs font-bold font-mono tracking-wider shrink-0"
-              >
-                Register Now
-              </Button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleDisabledClick}
-                className="py-2 px-4 border border-bone/30 bg-bone/5 text-bone/50 font-mono text-xs uppercase font-bold tracking-wider cursor-not-allowed shrink-0"
-              >
-                Closed
-              </button>
-            )}
+            <RegisterButton
+              event={event}
+              variant="chamfered"
+              size="sm"
+              cursorLabel="Register"
+              className="py-2 px-4 text-xs font-bold font-mono tracking-wider shrink-0"
+            >
+              Register Now
+            </RegisterButton>
           </motion.div>
         )}
       </AnimatePresence>

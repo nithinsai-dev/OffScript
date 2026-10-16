@@ -49,7 +49,7 @@ export function HeroTagline() {
   return (
     <div className="space-y-3">
       {/* Huge Outlined #beoffscript Typographic Headline */}
-      <div className="flex items-center text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black uppercase tracking-tight select-none">
+      <div className="hero-beoffscript-text flex items-center font-black uppercase tracking-tight select-none">
         <span className="text-volt pr-1 select-none">#</span>
         <span className="stroke-text font-black hover:text-bone transition-colors duration-300">
           beoffscript
@@ -57,7 +57,7 @@ export function HeroTagline() {
       </div>
 
       {/* Typing Rotating Phrase with Blinking Block Caret */}
-      <div className="flex items-center font-mono text-sm sm:text-base md:text-lg text-bone/70 uppercase tracking-widest h-7">
+      <div className="hero-typing-text flex items-center font-mono text-bone/70 uppercase tracking-widest h-7">
         <span className="text-volt font-bold pr-2">&gt;</span>
         <span>{activeText}</span>
         {!prefersReduced && (

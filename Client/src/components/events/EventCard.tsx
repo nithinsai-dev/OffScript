@@ -1,6 +1,7 @@
 import React, { useState, useId, useRef, useCallback, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { TicketShape, TicketBarcode } from '@/components/ui/TicketShape'
+import { RegisterButton } from '@/components/ui/RegisterButton'
 import { SeatsBar } from '@/components/events/SeatsBar'
 import { FALLBACK_COVER_IMAGE } from '@/lib/schemas'
 import { useCursor } from '@/hooks/useCursor'
@@ -143,20 +144,18 @@ function EventCardComponent({ event, isEager = false, className = '' }: EventCar
         </span>
       </div>
 
-      {/* 3. VERTICAL "ADMIT ONE" in its own reserved slot using writing-mode: vertical-rl */}
-      <div className="flex items-center justify-center sm:flex-1 my-0 sm:my-1 min-h-[20px] sm:min-h-[50px]">
-        <span
-          className="font-mono text-[9px] uppercase tracking-widest text-volt font-black select-none hidden sm:inline-block"
-          style={{
-            writingMode: 'vertical-rl',
-            transform: 'rotate(180deg)',
-          }}
+      {/* 3. CTA BUTTON / ADMIT ONE */}
+      <div className="flex items-center justify-center sm:flex-1 my-0 sm:my-1 w-full shrink-0">
+        <RegisterButton
+          event={event}
+          variant="chamfered"
+          size="xs"
+          fullWidth
+          cursorLabel="Pass"
+          className="text-[9px] py-1 px-1.5 leading-tight"
         >
-          ADMIT ONE
-        </span>
-        <span className="font-mono text-[9px] uppercase tracking-widest text-volt font-black select-none inline-block sm:hidden">
-          ADMIT ONE
-        </span>
+          Get Pass
+        </RegisterButton>
       </div>
 
       {/* 4. BOTTOM: Barcode */}

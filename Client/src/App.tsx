@@ -8,12 +8,20 @@ import { PageLoader } from '@/components/ui/Skeletons'
 export function App() {
   const [initialLoading, setInitialLoading] = useState(() => {
     if (typeof window === 'undefined') return false
-    return !sessionStorage.getItem('offscript_splash_seen')
+    try {
+      const isLite = document.documentElement.getAttribute('data-perf') === 'lite'
+      if (isLite) return false
+      return !sessionStorage.getItem('offscript_splash_seen')
+    } catch {
+      return false
+    }
   })
 
   const handleSplashComplete = () => {
-    if (typeof window !== 'undefined') {
+    try {
       sessionStorage.setItem('offscript_splash_seen', 'true')
+    } catch {
+      // Safe fallback
     }
     setInitialLoading(false)
   }

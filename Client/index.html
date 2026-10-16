@@ -33,8 +33,15 @@
     <link rel="dns-prefetch" href="https://render72.pages.dev" />
     <link rel="preconnect" href="https://images.pexels.com" crossorigin />
     <link rel="dns-prefetch" href="https://images.pexels.com" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Preload ONLY the LCP Title Font -->
+    <link
+      rel="preload"
+      href="/fonts/bricolage-grotesque-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
 
     <!-- Synchronous Lite Mode Determination before First Paint to prevent flash/overhead -->
     <script>
@@ -57,8 +64,28 @@
       })();
     </script>
 
-    <!-- Metric-Matched Fallback Font to Eliminate CLS -->
+    <!-- Critical Self-Hosted Fonts & Instant Hero Styles -->
     <style>
+      :root {
+        --ink: #111210;
+        --bone: #EDEBE0;
+        --volt: #D4FF3F;
+        --hero-type-scale: 0.9;
+      }
+      @font-face {
+        font-family: 'Bricolage Grotesque';
+        src: url('/fonts/bricolage-grotesque-latin.woff2') format('woff2');
+        font-weight: 600 800;
+        font-display: swap;
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
+        font-weight: 400 700;
+        font-display: swap;
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
       @font-face {
         font-family: 'Bricolage Grotesque Fallback';
         src: local('Arial');
@@ -75,29 +102,259 @@
         line-gap-override: 0%;
         size-adjust: 100%;
       }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #111210;
+        color: #EDEBE0;
+        font-family: 'Bricolage Grotesque', 'Bricolage Grotesque Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        overflow-x: clip;
+      }
+      .font-display {
+        font-family: 'Bricolage Grotesque', 'Bricolage Grotesque Fallback', sans-serif;
+      }
+      .font-mono {
+        font-family: 'JetBrains Mono', 'JetBrains Mono Fallback', monospace;
+      }
+      .font-sans {
+        font-family: 'Bricolage Grotesque', 'Bricolage Grotesque Fallback', sans-serif;
+      }
+      .stroke-text {
+        -webkit-text-stroke: 1.5px #EDEBE0;
+        color: transparent;
+      }
+      .clip-chamfer {
+        clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+      }
+      /* Shared Chamfer Outline Button */
+      .btn-chamfer-outline {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(237, 235, 224, 0.35);
+        color: #EDEBE0;
+        font-family: 'JetBrains Mono', 'JetBrains Mono Fallback', monospace;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background-color 0.2s ease, color 0.2s ease;
+        overflow: hidden;
+        clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+        -webkit-clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+      }
+      .btn-chamfer-outline::before {
+        content: "";
+        position: absolute;
+        inset: 2px;
+        background-color: #111210;
+        clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+        -webkit-clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+        z-index: 1;
+        transition: background-color 0.2s ease;
+      }
+      .btn-chamfer-outline:hover {
+        background-color: #D4FF3F;
+        color: #D4FF3F;
+      }
+      .btn-chamfer-outline:hover::before {
+        background-color: #111210;
+      }
+      .btn-chamfer-outline > * {
+        position: relative;
+        z-index: 2;
+      }
+      .btn-chamfer-outline:focus-visible {
+        outline: 2px solid #D4FF3F;
+        outline-offset: 3px;
+      }
+      /* Hero Typography Scale (Controlled strictly by --hero-type-scale) */
+      .hero-title-text {
+        font-size: calc(clamp(3.75rem, 2.5rem + 5vw, 8rem) * var(--hero-type-scale));
+        line-height: 0.88;
+      }
+      .hero-beoffscript-text {
+        font-size: calc(clamp(2.25rem, 1.5rem + 3.75vw, 6rem) * var(--hero-type-scale));
+        line-height: 1;
+      }
+      .hero-typing-text {
+        font-size: calc(clamp(0.875rem, 0.8rem + 0.3vw, 1.125rem) * var(--hero-type-scale));
+      }
+      .hero-para-text {
+        font-size: calc(clamp(1rem, 0.95rem + 0.2vw, 1.125rem) * var(--hero-type-scale));
+      }
     </style>
 
-    <!-- Non-Render-Blocking Google Fonts with display: swap -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=JetBrains+Mono:wght@400;700&display=swap"
-    />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=JetBrains+Mono:wght@400;700&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=JetBrains+Mono:wght@400;700&display=swap"
-      />
-    </noscript>
+    <!-- Pre-Hydration Shell Register Clicks Interception (< 600 bytes) -->
+    <script>
+      (function() {
+        document.addEventListener('click', function(e) {
+          var t = e.target && e.target.closest ? e.target.closest('[data-register]') : null;
+          if (t) {
+            e.preventDefault();
+            window.__registerPending = true;
+            var m = document.getElementById('static-shell-reg-msg');
+            if (!m) {
+              m = document.createElement('div');
+              m.id = 'static-shell-reg-msg';
+              m.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:999999;background:#111210;color:#D4FF3F;border:2px solid #D4FF3F;padding:10px 20px;font-family:monospace;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;box-shadow:0 8px 30px rgba(0,0,0,0.8);pointer-events:none;';
+              m.textContent = "Registrations aren't open yet. Check back soon.";
+              document.body.appendChild(m);
+              setTimeout(function() { if (m && m.parentNode) m.parentNode.removeChild(m); }, 4000);
+            }
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body class="bg-ink text-bone font-sans antialiased selection:bg-volt selection:text-ink min-h-screen">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static Landing Hero Shell (Replaced by React without layout shift) -->
+      <div id="ssr-landing">
+        <div class="fixed top-4 left-0 right-0 z-50 flex justify-center pointer-events-none px-2 sm:px-4">
+          <header role="banner" class="pointer-events-auto w-full max-w-[880px] translate-y-0 opacity-100">
+            <div class="relative bg-[#111210]/92 backdrop-blur-md clip-chamfer border-2 border-[#EDEBE0]/20 px-2.5 py-1.5 sm:px-5 sm:py-2.5 shadow-2xl">
+              <nav aria-label="Main Navigation" class="flex items-center justify-between gap-1.5 sm:gap-4">
+                <a href="/" class="flex items-center gap-1.5 sm:gap-2 px-1 py-0.5 group shrink-0">
+                  <span class="w-2 h-2 bg-[#D4FF3F] shrink-0 rotate-45"></span>
+                  <span class="font-display text-lg sm:text-2xl font-black text-[#EDEBE0] tracking-tight uppercase">OFFSCRIPT</span>
+                </a>
+                <div class="hidden md:flex items-center gap-1 relative bg-[#EDEBE0]/[0.04] p-1 border border-[#EDEBE0]/15">
+                  <span class="relative px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider text-[#111210] font-black bg-[#D4FF3F]" style="clip-path:polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px)">Featured</span>
+                  <span class="relative px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider text-[#EDEBE0]/70">Countdown</span>
+                  <a href="/events" class="relative px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider text-[#EDEBE0]/70">Events</a>
+                  <span class="relative px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider text-[#EDEBE0]/70">Sponsors</span>
+                  <span class="relative px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider text-[#EDEBE0]/70">Lineup</span>
+                </div>
+                <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                  <button type="button" data-register="true" class="inline-flex items-center justify-center font-mono uppercase select-none transition-all duration-150 border-2 bg-[#D4FF3F] text-[#111210] border-[#D4FF3F] shadow-none px-2.5 py-1 text-[11px] sm:px-3.5 sm:py-1.5 sm:text-xs font-bold tracking-wider cursor-pointer" style="clip-path:polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px)">Register</button>
+                  <div class="md:hidden flex flex-col items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] border border-[#EDEBE0]/30 text-[#EDEBE0]">
+                    <span class="block h-0.5 w-4 bg-current -translate-y-1"></span>
+                    <span class="block h-0.5 w-4 bg-current translate-y-1"></span>
+                  </div>
+                </div>
+              </nav>
+            </div>
+          </header>
+        </div>
+
+        <section id="hero" data-in-hero="true" class="relative min-h-[90vh] pt-32 pb-20 md:pt-40 md:pb-28 flex flex-col justify-between border-b-2 border-[#EDEBE0]/20 overflow-hidden">
+          <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10 space-y-12">
+            <div class="space-y-6 max-w-4xl relative">
+              <div class="space-y-2">
+                <h1 class="hero-title-text font-display font-black tracking-tight text-[#EDEBE0] uppercase">
+                  OFFSCRIPT
+                </h1>
+                <div id="hero-tagline" class="space-y-3">
+                  <div class="hero-beoffscript-text flex items-center font-black uppercase tracking-tight select-none">
+                    <span class="text-[#D4FF3F] pr-1 select-none">#</span>
+                    <span class="stroke-text font-black hover:text-[#EDEBE0] transition-colors duration-300">beoffscript</span>
+                  </div>
+                  <div class="hero-typing-text flex items-center font-mono text-[#EDEBE0]/70 uppercase tracking-widest h-7">
+                    <span class="text-[#D4FF3F] font-bold pr-2">&gt;</span>
+                    <span>find your event</span>
+                    <span class="inline-block w-2.5 h-4 ml-1 bg-[#D4FF3F] animate-pulse"></span>
+                  </div>
+                </div>
+              </div>
+              <p id="hero-supporting" class="hero-para-text font-sans text-[#EDEBE0]/75 max-w-xl leading-relaxed">
+                Your campus. Your events. Zero boring. Discover and grab your passes for hackathons, jams, and festivals in seconds.
+              </p>
+              <div id="hero-buttons" class="flex flex-wrap items-center gap-4 pt-2">
+                <a href="/events" class="inline-flex items-center justify-center font-mono uppercase select-none transition-all duration-150 border-2 bg-[#D4FF3F] text-[#111210] border-[#D4FF3F] hover:bg-[#D4FF3F]/90 text-sm px-6 py-3.5 font-black tracking-wider" style="clip-path:polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px)">
+                  Explore Events
+                </a>
+                <a href="#lineup" class="btn-chamfer-outline text-sm px-6 py-3.5 font-bold tracking-wider">
+                  <span>See Lineup</span>
+                </a>
+              </div>
+              <div id="hero-sticker" class="absolute right-0 top-4 hidden lg:flex items-center gap-2 px-3.5 py-1.5 bg-[#D4FF3F] text-[#111210] font-mono text-xs font-black uppercase tracking-wider rotate-6 border-2 border-[#111210] shadow-2xl select-none pointer-events-none">
+                <span class="w-2 h-2 bg-[#111210] rotate-45"></span>
+                <span>2026 EDITION</span>
+              </div>
+            </div>
+            <div id="hero-stats" class="relative w-full max-w-3xl pt-8 border-t-2 border-[#EDEBE0]/15 select-none">
+              <div class="relative bg-[#111210] border-2 border-[#EDEBE0]/25 shadow-xl overflow-hidden p-0">
+                <span class="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full bg-[#111210] border-2 border-[#EDEBE0]/25 pointer-events-none z-20"></span>
+                <span class="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-[#111210] border-2 border-[#EDEBE0]/25 pointer-events-none z-20"></span>
+                <span class="absolute -bottom-2.5 -left-2.5 w-5 h-5 rounded-full bg-[#111210] border-2 border-[#EDEBE0]/25 pointer-events-none z-20"></span>
+                <span class="absolute -bottom-2.5 -right-2.5 w-5 h-5 rounded-full bg-[#111210] border-2 border-[#EDEBE0]/25 pointer-events-none z-20"></span>
+                <div class="flex flex-col md:flex-row items-stretch min-h-[148px] md:min-h-[120px]">
+                  <div class="flex-1 grid grid-cols-3 items-stretch relative">
+                    <div class="p-3 sm:p-5 flex flex-col justify-center min-w-0">
+                      <span class="font-mono text-[10px] sm:text-xs text-[#EDEBE0]/50 uppercase tracking-widest block truncate">Live Events</span>
+                      <span class="font-display text-2xl sm:text-3xl md:text-4xl font-black text-[#EDEBE0] block tabular-nums tracking-tight mt-0.5">30</span>
+                    </div>
+                    <div class="p-3 sm:p-5 flex flex-col justify-center min-w-0 border-x border-[#EDEBE0]/10 md:border-none">
+                      <span class="font-mono text-[10px] sm:text-xs text-[#EDEBE0]/50 uppercase tracking-widest block truncate">Open Events</span>
+                      <span class="font-display text-2xl sm:text-3xl md:text-4xl font-black text-[#D4FF3F] block tabular-nums tracking-tight mt-0.5">24</span>
+                    </div>
+                    <div class="p-3 sm:p-5 flex flex-col justify-center min-w-0">
+                      <span class="font-mono text-[10px] sm:text-xs text-[#EDEBE0]/50 uppercase tracking-widest block truncate">Seats Left</span>
+                      <span class="font-display text-2xl sm:text-3xl md:text-4xl font-black text-[#EDEBE0] block tabular-nums tracking-tight mt-0.5">260</span>
+                    </div>
+                  </div>
+                  <div class="md:hidden relative h-[1px] w-full border-b border-dashed border-[#EDEBE0]/25"></div>
+                  <div class="hidden md:block relative w-[1px] border-r border-dashed border-[#EDEBE0]/25 shrink-0"></div>
+                  <div class="p-3 sm:p-4 md:px-5 md:py-3.5 flex flex-col justify-between items-center md:items-end bg-[#EDEBE0]/[0.02] shrink-0">
+                    <div class="relative flex items-end justify-center md:justify-end gap-[2px] h-[56px] w-full max-w-full overflow-hidden px-1">
+                      <div class="w-[2px] sm:w-[3px] h-[45%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[80%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[60%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[95%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[35%] bg-[#EDEBE0]/25 shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[70%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[50%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[85%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[40%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[75%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[30%] bg-[#EDEBE0]/25 shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[65%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[90%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[55%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[40%] bg-[#D4FF3F] shrink-0"></div>
+                      <div class="w-[2px] sm:w-[3px] h-[80%] bg-[#D4FF3F] shrink-0"></div>
+                    </div>
+                    <div class="font-mono text-[9px] sm:text-[10px] text-[#EDEBE0]/50 uppercase tracking-widest pt-1.5 text-center md:text-right">
+                      1 BAR = 1 EVENT
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Static Events Shell -->
+      <div id="ssr-events" style="display:none" class="pt-28 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
+        <div class="space-y-3">
+          <div class="inline-block px-3 py-1 bg-[#D4FF3F] text-[#111210] font-mono text-xs font-black uppercase tracking-wider">Pass Explorer</div>
+          <h1 class="font-display font-black text-4xl sm:text-6xl text-[#EDEBE0] uppercase tracking-tight">ALL EVENTS</h1>
+        </div>
+        <div class="h-12 w-full max-w-md bg-[#EDEBE0]/10 border-2 border-[#EDEBE0]/20"></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="h-64 bg-[#EDEBE0]/5 border-2 border-[#EDEBE0]/15 animate-pulse"></div>
+          <div class="h-64 bg-[#EDEBE0]/5 border-2 border-[#EDEBE0]/15 animate-pulse"></div>
+          <div class="h-64 bg-[#EDEBE0]/5 border-2 border-[#EDEBE0]/15 animate-pulse"></div>
+        </div>
+      </div>
+
+      <script>
+        (function() {
+          try {
+            if (window.location.pathname.startsWith('/events')) {
+              var sl = document.getElementById('ssr-landing');
+              var se = document.getElementById('ssr-events');
+              if (sl) sl.style.display = 'none';
+              if (se) se.style.display = 'block';
+            }
+          } catch (e) {}
+        })();
+      </script>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

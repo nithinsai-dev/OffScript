@@ -140,6 +140,13 @@ export const MOTION = {
     stickerSpring: scaleDuration(1.5), // Floating sticker springs in at ~1.5s
     marqueeFade: scaleDuration(1.7), // Marquee fades in at ~1.7s
   },
+
+  // PART 9: Registration Notice Dialog
+  registrationDialog: {
+    backdropFade: scaleDuration(0.25),
+    dialogRise: scaleDuration(0.3),
+    reducedFade: scaleDuration(0.15),
+  },
 } as const
 
 // Export CSS Custom Properties sync function so CSS animations inherit MOTION_SCALE

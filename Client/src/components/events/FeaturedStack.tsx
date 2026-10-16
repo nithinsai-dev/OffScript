@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { TicketShape, TicketBarcode } from '@/components/ui/TicketShape'
 import { Stamp } from '@/components/ui/Stamp'
-import { Button } from '@/components/ui/Button'
+import { RegisterButton } from '@/components/ui/RegisterButton'
 import { SeatsBar } from '@/components/events/SeatsBar'
 import { formatPrice, formatTeamSize } from '@/lib/formatters'
 import { FALLBACK_COVER_IMAGE } from '@/lib/schemas'
@@ -48,15 +47,18 @@ function FeaturedCardItem({ event, idx }: { event: Event; idx: number }) {
       </div>
 
       {/* 3. CTA BUTTON */}
-      <Link
-        to="/events/$eventId"
-        params={{ eventId: event.id }}
-        className="pt-0 sm:pt-2 w-auto sm:w-full shrink-0"
-      >
-        <Button variant="primary" size="sm" fullWidth cursorLabel="Pass" className="text-[11px] py-1 px-3 sm:py-1.5 sm:px-4">
+      <div className="pt-0 sm:pt-2 w-auto sm:w-full shrink-0">
+        <RegisterButton
+          event={event}
+          variant="chamfered"
+          size="sm"
+          fullWidth
+          cursorLabel="Pass"
+          className="text-[11px] py-1 px-3 sm:py-1.5 sm:px-4"
+        >
           Get Pass
-        </Button>
-      </Link>
+        </RegisterButton>
+      </div>
     </div>
   )
 

@@ -12,7 +12,7 @@ type Listener = () => void
 let isOverlayActive = false
 let isPageRevealed = false
 let curtainClearedTimestamp = 0
-let listeners = new Set<Listener>()
+const listeners = new Set<Listener>()
 let revealPromise: Promise<void> | null = null
 let resolveRevealPromise: (() => void) | null = null
 let failsafeTimer: ReturnType<typeof setTimeout> | null = null

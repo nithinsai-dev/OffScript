@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
 import { MOTION, scaleMs } from '@/lib/motion'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 import { notifyOverlayActive, notifyOverlayCleared } from '@/lib/pageReady'
@@ -126,43 +125,33 @@ export function PageTransition({ children, locationKey }: PageTransitionProps) {
       </div>
 
       {/* Volt Curtain Overlay */}
-      <AnimatePresence>
-        {curtainPhase !== 'idle' && curtainPhase !== 'leadExit' && (
-          <motion.div
-            key="route-curtain"
-            className="fixed inset-0 z-50 flex items-center justify-center bg-volt border-b-4 border-ink pointer-events-none"
-            initial={curtainPhase === 'covering' ? { y: '100%' } : { y: '0%' }}
-            animate={curtainPhase === 'covering' || curtainPhase === 'holding' ? { y: '0%' } : { y: '-100%' }}
-            transition={
-              curtainPhase === 'covering'
-                ? { duration: 0.45, ease: [0.22, 1, 0.36, 1] }
-                : curtainPhase === 'revealing'
-                ? { duration: 0.45, ease: [0.22, 1, 0.36, 1] }
-                : { duration: 0 }
+      {curtainPhase !== 'idle' && curtainPhase !== 'leadExit' && (
+        <div
+          key="route-curtain"
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-volt border-b-4 border-ink pointer-events-none ${
+            curtainPhase === 'covering'
+              ? 'curtain-covering'
+              : curtainPhase === 'holding'
+              ? 'curtain-holding'
+              : 'curtain-revealing'
+          }`}
+          onAnimationEnd={(e) => {
+            if (curtainPhase === 'revealing' && e.target === e.currentTarget) {
+              notifyOverlayCleared('route-curtain')
             }
-            onAnimationComplete={() => {
-              if (curtainPhase === 'revealing') {
-                notifyOverlayCleared('route-curtain')
-              }
-            }}
-          >
-            {/* OFFSCRIPT Wordmark write-in at center during hold */}
-            {(curtainPhase === 'holding' || curtainPhase === 'revealing') && (
-              <motion.div
-                initial={{ clipPath: 'inset(0 100% 0 0)', opacity: 0 }}
-                animate={{ clipPath: 'inset(0 0% 0 0)', opacity: 1 }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="flex items-center gap-3 font-display text-4xl md:text-6xl font-black text-ink tracking-tight uppercase select-none"
-              >
-                <span>OFFSCRIPT</span>
-                <span className="font-mono text-xs tracking-widest bg-ink text-volt px-3 py-1 border border-ink uppercase font-black">
-                  #beoffscript
-                </span>
-              </motion.div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          }}
+        >
+          {/* OFFSCRIPT Wordmark write-in at center during hold */}
+          {(curtainPhase === 'holding' || curtainPhase === 'revealing') && (
+            <div className="curtain-wordmark flex items-center gap-3 font-display text-4xl md:text-6xl font-black text-ink tracking-tight uppercase select-none">
+              <span>OFFSCRIPT</span>
+              <span className="font-mono text-xs tracking-widest bg-ink text-volt px-3 py-1 border border-ink uppercase font-black">
+                #beoffscript
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

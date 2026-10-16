@@ -3,22 +3,31 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/Button'
 import { SplitText } from '@/components/effects/SplitText'
 import { HeroTagline } from '@/components/effects/HeroTagline'
-import { CountUp } from '@/components/effects/CountUp'
 import { HeroStage } from '@/components/effects/HeroStage'
+import { HeroTicketStrip } from '@/components/events/HeroTicketStrip'
 import { VelocityMarquee } from '@/components/events/VelocityMarquee'
-import { FeaturedStack } from '@/components/events/FeaturedStack'
-import { CountdownSection } from '@/components/events/CountdownSection'
 import { BrowseAllStrip } from '@/components/events/BrowseAllStrip'
-import { WhySection } from '@/components/events/WhySection'
-import { SponsorsSection } from '@/components/events/SponsorsSection'
 import { EventCardSkeleton } from '@/components/ui/Skeletons'
 import { SectionError } from '@/components/ui/SectionError'
 import { useEventsQuery } from '@/features/events/queries'
 import { useLenis, easeOutExpo } from '@/hooks/useLenis'
+import { useCursor } from '@/hooks/useCursor'
 import { MOTION } from '@/lib/motion'
 import { handleRouteChangeReveals } from '@/lib/reveal'
 import { whenRevealed, logAnimationStart } from '@/lib/pageReady'
 
+const LazyFeaturedStack = lazy(() =>
+  import('@/components/events/FeaturedStack').then((m) => ({ default: m.FeaturedStack }))
+)
+const LazyCountdownSection = lazy(() =>
+  import('@/components/events/CountdownSection').then((m) => ({ default: m.CountdownSection }))
+)
+const LazyWhySection = lazy(() =>
+  import('@/components/events/WhySection').then((m) => ({ default: m.WhySection }))
+)
+const LazySponsorsSection = lazy(() =>
+  import('@/components/events/SponsorsSection').then((m) => ({ default: m.SponsorsSection }))
+)
 const LazyLineupSection = lazy(() =>
   import('@/components/events/LineupSection').then((m) => ({ default: m.LineupSection }))
 )
@@ -28,20 +37,17 @@ export function LandingPage() {
   const { scrollTo } = useLenis()
   const navigate = useNavigate()
   const router = useRouter()
+  const { setCursor, resetCursor } = useCursor()
 
   const events = useMemo(() => data?.events ?? [], [data?.events])
   const hasCachedData = events.length > 0
   const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
 
-  // Real-time fest stats from API data
+  // Summary counts for directory strip
   const stats = useMemo(() => {
     const totalEvents = events.length
-    const openRegistrations = events.filter((e) => e.registration_status === 'OPEN').length
-    const remainingSeats = events.reduce(
-      (acc, e) => acc + Math.max(0, (e.total_seats ?? 0) - (e.seats_filled ?? 0)),
-      0
-    )
-    return { totalEvents, openRegistrations, remainingSeats }
+    const openEvents = events.filter((e) => e.registration_status === 'OPEN').length
+    return { totalEvents, openEvents }
   }, [events])
 
   // Scroll to anchor section when navigating to "/" from "/events" or another route
@@ -230,14 +236,6 @@ export function LandingPage() {
     }
   }, [])
 
-  const handleNav = (target: string) => {
-    scrollTo(target, {
-      offset: -96,
-      duration: 0.9,
-      easing: easeOutExpo,
-    })
-  }
-
   const handlePrefetchEvents = () => {
     router.preloadRoute({ to: '/events' })
   }
@@ -255,7 +253,7 @@ export function LandingPage() {
           <div className="space-y-6 max-w-4xl relative">
             {/* Wordmark Headline (1.3s character masked rise starting on first painted frame) */}
             <div className="space-y-2">
-              <h1 className="font-display font-black text-6xl sm:text-7xl md:text-8xl lg:text-9xl leading-[0.88] tracking-tight text-bone uppercase">
+              <h1 className="hero-title-text font-display font-black tracking-tight text-bone uppercase">
                 <SplitText text="OFFSCRIPT" tag="span" isHeroTitle />
               </h1>
 
@@ -266,7 +264,7 @@ export function LandingPage() {
             </div>
 
             {/* Friendly One-Line Statement */}
-            <p id="hero-supporting" className="font-sans text-base sm:text-lg text-bone/75 max-w-xl leading-relaxed">
+            <p id="hero-supporting" className="hero-para-text font-sans text-bone/75 max-w-xl leading-relaxed">
               Your campus. Your events. Zero boring. Discover and grab your passes for hackathons, jams, and festivals in seconds.
             </p>
 
@@ -283,14 +281,21 @@ export function LandingPage() {
               >
                 Explore Events
               </Button>
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={() => handleNav('#lineup')}
-                cursorLabel="Lineup"
+              <button
+                type="button"
+                className="btn-chamfer-outline text-sm px-6 py-3.5 font-bold tracking-wider"
+                onClick={() => {
+                  scrollTo('#lineup', {
+                    offset: -96,
+                    duration: 0.9,
+                    easing: easeOutExpo,
+                  })
+                }}
+                onMouseEnter={() => setCursor('button', 'Lineup')}
+                onMouseLeave={resetCursor}
               >
-                See Lineup
-              </Button>
+                <span>See Lineup</span>
+              </button>
             </div>
 
             {/* Floating Sticker Badge (Part 8) */}
@@ -299,39 +304,12 @@ export function LandingPage() {
               className="absolute right-0 top-4 hidden lg:flex items-center gap-2 px-3.5 py-1.5 bg-volt text-ink font-mono text-xs font-black uppercase tracking-wider rotate-6 border-2 border-ink shadow-2xl select-none pointer-events-none"
             >
               <span className="w-2 h-2 bg-ink rotate-45" />
-              <span>2026 PASSES LIVE</span>
+              <span>2026 EDITION</span>
             </div>
           </div>
 
-          {/* 3 Big Stats with CountUp from API Data */}
-          <div id="hero-stats" className="pt-8 border-t-2 border-bone/15 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl">
-            <div className="p-4 border-2 border-bone/20 bg-bone/[0.02] space-y-1">
-              <span className="font-mono text-xs text-bone/50 uppercase tracking-widest block">
-                Live Events
-              </span>
-              <span className="font-display text-3xl sm:text-4xl font-black text-bone block">
-                {isLoading ? '--' : <CountUp end={stats.totalEvents} />}
-              </span>
-            </div>
-
-            <div className="p-4 border-2 border-bone/20 bg-bone/[0.02] space-y-1">
-              <span className="font-mono text-xs text-bone/50 uppercase tracking-widest block">
-                Open Registrations
-              </span>
-              <span className="font-display text-3xl sm:text-4xl font-black text-volt block">
-                {isLoading ? '--' : <CountUp end={stats.openRegistrations} />}
-              </span>
-            </div>
-
-            <div className="p-4 border-2 border-bone/20 bg-bone/[0.02] space-y-1">
-              <span className="font-mono text-xs text-bone/50 uppercase tracking-widest block">
-                Seats Left
-              </span>
-              <span className="font-display text-3xl sm:text-4xl font-black text-bone block">
-                {isLoading ? '--' : <CountUp end={stats.remainingSeats} />}
-              </span>
-            </div>
-          </div>
+          {/* Hero Ticket Strip with Data Barcode */}
+          <HeroTicketStrip />
 
           {/* Invisible Reserved 3D Slot */}
           <HeroStage />
@@ -345,7 +323,7 @@ export function LandingPage() {
 
       {/* 3. FEATURED VERTICAL STACKING PASSES (Below the fold: revealed by scroll reveal) */}
       {isLoading ? (
-        <section id="featured" data-reveal="card" className="py-24 border-b-2 border-bone/15 bg-ink">
+        <section id="featured" data-reveal="card" className="py-24 border-b-2 border-bone/15 bg-ink" style={{ contentVisibility: 'auto', containIntrinsicSize: '600px' }}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
             <div className="w-64 h-8 bg-bone/10 animate-pulse" />
             <div className="grid grid-cols-1 gap-6">
@@ -354,9 +332,22 @@ export function LandingPage() {
           </div>
         </section>
       ) : hasCachedData ? (
-        <div data-reveal="rail">
-          <FeaturedStack events={events} />
-        </div>
+        <Suspense
+          fallback={
+            <section id="featured" className="py-24 border-b-2 border-bone/15 bg-ink">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+                <div className="w-64 h-8 bg-bone/10 animate-pulse" />
+                <div className="grid grid-cols-1 gap-6">
+                  <EventCardSkeleton />
+                </div>
+              </div>
+            </section>
+          }
+        >
+          <div data-reveal="rail" style={{ contentVisibility: 'auto', containIntrinsicSize: '650px' }}>
+            <LazyFeaturedStack events={events} />
+          </div>
+        </Suspense>
       ) : isError || isOffline ? (
         <section id="featured" className="py-16 border-b-2 border-bone/15 bg-ink">
           <SectionError
@@ -368,27 +359,33 @@ export function LandingPage() {
       ) : null}
 
       {/* 4. COUNTDOWN SECTION */}
-      <div data-reveal="card">
-        <CountdownSection events={events} />
-      </div>
+      <Suspense fallback={<div className="h-48 bg-ink border-b-2 border-bone/15 animate-pulse" />}>
+        <div data-reveal="card" style={{ contentVisibility: 'auto', containIntrinsicSize: '400px' }}>
+          <LazyCountdownSection events={events} />
+        </div>
+      </Suspense>
 
       {/* 5. SLIM BROWSE ALL EVENTS STRIP (In place of All events grid) */}
-      <div data-reveal="rail">
+      <div data-reveal="rail" style={{ contentVisibility: 'auto', containIntrinsicSize: '200px' }}>
         <BrowseAllStrip
           totalEvents={stats.totalEvents}
-          openRegistrations={stats.openRegistrations}
+          openRegistrations={stats.openEvents}
         />
       </div>
 
       {/* 6. WHY OFFSCRIPT (3 SIGNATURE HOVER CARDS) - container revealed, hover content unchanged */}
-      <div data-reveal="card">
-        <WhySection />
-      </div>
+      <Suspense fallback={<div className="h-64 bg-ink border-b-2 border-bone/15 animate-pulse" />}>
+        <div data-reveal="card" style={{ contentVisibility: 'auto', containIntrinsicSize: '500px' }}>
+          <LazyWhySection />
+        </div>
+      </Suspense>
 
       {/* 7. SPONSORS MARQUEE */}
-      <div data-reveal="card">
-        <SponsorsSection />
-      </div>
+      <Suspense fallback={<div className="h-32 bg-ink border-b-2 border-bone/15 animate-pulse" />}>
+        <div data-reveal="card" style={{ contentVisibility: 'auto', containIntrinsicSize: '250px' }}>
+          <LazySponsorsSection />
+        </div>
+      </Suspense>
 
       {/* 8. EVENT LINEUP (HORIZONTAL STICKY SCROLL - LAST SECTION BEFORE FOOTER) */}
       {isLoading ? (

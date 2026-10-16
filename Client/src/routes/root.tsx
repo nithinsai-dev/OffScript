@@ -18,6 +18,7 @@ const LazyCursor = lazy(() =>
 const LazyGrainOverlay = lazy(() =>
   import('@/components/effects/GrainOverlay').then((m) => ({ default: m.GrainOverlay }))
 )
+import { RegistrationNotice } from '@/components/RegistrationNotice'
 
 export function RootLayout() {
   usePerfGovernor()
@@ -83,6 +84,9 @@ export function RootLayout() {
               <Footer />
               <BackToTop />
             </div>
+
+            {/* Global Registration Notice Dialog (mounted via createPortal) */}
+            <RegistrationNotice />
           </ErrorBoundary>
         </ToastProvider>
       </CursorProvider>

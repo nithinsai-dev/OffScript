@@ -1,10 +1,6 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
-import Lenis from 'lenis'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import type Lenis from 'lenis'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
-
-gsap.registerPlugin(ScrollTrigger)
 
 export const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t))
 
@@ -40,35 +36,46 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     }
 
     let cleanup: (() => void) | undefined
+    let isCancelled = false
     const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
     const handle = schedule(() => {
-      const lenis = new Lenis({
-        duration: 0.9,
-        easing: easeOutExpo,
-        smoothWheel: true,
-        touchMultiplier: 1.5,
+      Promise.all([
+        import('lenis'),
+        import('gsap'),
+        import('gsap/ScrollTrigger'),
+      ]).then(([{ default: LenisConstructor }, { default: gsap }, { ScrollTrigger }]) => {
+        if (isCancelled) return
+        gsap.registerPlugin(ScrollTrigger)
+
+        const lenis = new LenisConstructor({
+          duration: 0.9,
+          easing: easeOutExpo,
+          smoothWheel: true,
+          touchMultiplier: 1.5,
+        })
+
+        lenisRef.current = lenis
+
+        // Sync Lenis scroll with GSAP ScrollTrigger
+        lenis.on('scroll', ScrollTrigger.update)
+
+        const tickerCallback = (time: number) => {
+          lenis.raf(time * 1000)
+        }
+
+        gsap.ticker.add(tickerCallback)
+        gsap.ticker.lagSmoothing(0)
+
+        cleanup = () => {
+          gsap.ticker.remove(tickerCallback)
+          lenis.destroy()
+          lenisRef.current = null
+        }
       })
-
-      lenisRef.current = lenis
-
-      // Sync Lenis scroll with GSAP ScrollTrigger
-      lenis.on('scroll', ScrollTrigger.update)
-
-      const tickerCallback = (time: number) => {
-        lenis.raf(time * 1000)
-      }
-
-      gsap.ticker.add(tickerCallback)
-      gsap.ticker.lagSmoothing(0)
-
-      cleanup = () => {
-        gsap.ticker.remove(tickerCallback)
-        lenis.destroy()
-        lenisRef.current = null
-      }
     })
 
     return () => {
+      isCancelled = true
       if (window.cancelIdleCallback) window.cancelIdleCallback(handle as number)
       if (cleanup) cleanup()
     }

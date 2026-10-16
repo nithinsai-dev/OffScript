@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { motion, useMotionValue } from 'motion/react'
 import gsap from 'gsap'
 import { TicketShape, TicketBarcode } from '@/components/ui/TicketShape'
-import { Button } from '@/components/ui/Button'
+import { RegisterButton } from '@/components/ui/RegisterButton'
 import { formatPrice } from '@/lib/formatters'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 import { MOTION_SCALE } from '@/lib/motion'
@@ -498,20 +498,17 @@ export function LineupSection({ events = [], isLoading, isError }: LineupSection
                                 </span>
                               </div>
 
-                              <Link
-                                to="/events/$eventId"
-                                params={{ eventId: event.id }}
-                                className="block w-full pt-1"
-                              >
-                                <Button
-                                  variant="primary"
+                              <div className="block w-full pt-1">
+                                <RegisterButton
+                                  event={event}
+                                  variant="chamfered"
                                   size="sm"
                                   fullWidth
-                                  cursorLabel="View"
+                                  cursorLabel="Register"
                                 >
-                                  View pass →
-                                </Button>
-                              </Link>
+                                  Get Pass
+                                </RegisterButton>
+                              </div>
                             </div>
                           </div>
                         </TicketShape>

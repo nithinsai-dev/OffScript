@@ -19,7 +19,13 @@ export default defineConfig({
   },
   build: {
     cssCodeSplit: true,
-    modulePreload: { polyfill: false },
+    modulePreload: {
+      polyfill: false,
+      resolveDependencies: (_url, _deps, _context) => {
+        // Only preload the entry chunk itself, never preload lazy chunks
+        return []
+      },
+    },
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {

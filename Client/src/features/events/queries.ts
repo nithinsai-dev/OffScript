@@ -7,17 +7,27 @@ import type { EventDetail, EventsApiResponse } from '@/types/event'
 export const EVENTS_QUERY_KEY = ['events']
 export const eventDetailQueryKey = (id: string) => ['events', id]
 
+export const eventsQueryOptions = () => ({
+  queryKey: EVENTS_QUERY_KEY,
+  queryFn: getAllEvents,
+  staleTime: 60 * 1000,
+})
+
+export const eventDetailQueryOptions = (id: string) => ({
+  queryKey: eventDetailQueryKey(id),
+  queryFn: () => getEventById(id),
+  staleTime: 60 * 1000,
+})
+
 /**
  * Hook to fetch all events with caching and instant fixture seeding
  */
 export function useEventsQuery() {
   return useQuery<EventsApiResponse>({
-    queryKey: EVENTS_QUERY_KEY,
-    queryFn: getAllEvents,
+    ...eventsQueryOptions(),
     initialData: () => ({
       events: FIXTURE_EVENTS,
     }),
-    staleTime: 60 * 1000,
   })
 }
 

@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useRouterState, useNavigate, useRouter } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { Button } from '@/components/ui/Button'
-import { REGISTRATION_URL_BASE } from '@/lib/config'
+import { RegisterButton } from '@/components/ui/RegisterButton'
 import { useScrollProgress } from '@/hooks/useScrollProgress'
 import { useLenis, easeOutExpo } from '@/hooks/useLenis'
 import { useTextScramble } from '@/hooks/useTextScramble'
@@ -323,17 +322,13 @@ export function Navbar() {
 
             {/* Right Side: Chamfered Register Button + Mobile Toggle */}
             <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-              <Button
-                variant="primary"
-                size="sm"
-                href={REGISTRATION_URL_BASE}
-                target="_blank"
-                rel="noreferrer"
+              <RegisterButton
+                variant="compact"
                 cursorLabel="Register"
                 className="shadow-none px-2.5 py-1 text-[11px] sm:px-3.5 sm:py-1.5 sm:text-xs font-bold font-mono tracking-wider"
               >
                 Register
-              </Button>
+              </RegisterButton>
 
               {/* Mobile Hamburger Toggle (At least 44x44px tap target) */}
               <button
@@ -411,16 +406,14 @@ export function Navbar() {
             </div>
 
             <div className="space-y-4 pt-6 border-t border-bone/15">
-              <Button
-                variant="primary"
+              <RegisterButton
+                variant="chamfered"
                 size="lg"
                 fullWidth
-                href={REGISTRATION_URL_BASE}
-                target="_blank"
-                rel="noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
               >
                 Register For Fest
-              </Button>
+              </RegisterButton>
               <div className="text-center font-mono text-[11px] text-bone/40">
                 #beoffscript
               </div>

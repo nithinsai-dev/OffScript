@@ -1,6 +1,7 @@
 import { Link, useRouterState, useNavigate } from '@tanstack/react-router'
 import { useLenis, easeOutExpo } from '@/hooks/useLenis'
-import { BRAND, REGISTRATION_URL_BASE } from '@/lib/config'
+import { BRAND } from '@/lib/config'
+import { RegisterButton } from '@/components/ui/RegisterButton'
 
 export function Footer() {
   const { scrollTo } = useLenis()
@@ -96,14 +97,13 @@ export function Footer() {
               Hosting an event on campus? Get listed in minutes.
             </p>
             <div className="pt-2">
-              <a
-                href={REGISTRATION_URL_BASE}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block border-2 border-bone/30 px-4 py-2 text-bone/90 hover:border-volt hover:text-volt transition-colors uppercase font-bold"
+              <RegisterButton
+                variant="outline"
+                size="sm"
+                className="inline-block px-4 py-2 uppercase font-bold text-bone/90 hover:border-volt hover:text-volt"
               >
                 Submit an Event ↗
-              </a>
+              </RegisterButton>
             </div>
           </div>
         </div>

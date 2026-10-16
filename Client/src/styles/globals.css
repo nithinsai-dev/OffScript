@@ -4,6 +4,104 @@
   --ink: #111210;
   --bone: #EDEBE0;
   --volt: #D4FF3F;
+  --hero-type-scale: 0.9;
+}
+
+/* Shared Chamfer Outline Button */
+.btn-chamfer-outline {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(237, 235, 224, 0.35);
+  color: #EDEBE0;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  overflow: hidden;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 12px) 0,
+    100% 12px,
+    100% 100%,
+    12px 100%,
+    0 calc(100% - 12px)
+  );
+  -webkit-clip-path: polygon(
+    0 0,
+    calc(100% - 12px) 0,
+    100% 12px,
+    100% 100%,
+    12px 100%,
+    0 calc(100% - 12px)
+  );
+}
+
+.btn-chamfer-outline::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background-color: #111210;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 11px) 0,
+    100% 11px,
+    100% 100%,
+    11px 100%,
+    0 calc(100% - 11px)
+  );
+  -webkit-clip-path: polygon(
+    0 0,
+    calc(100% - 11px) 0,
+    100% 11px,
+    100% 100%,
+    11px 100%,
+    0 calc(100% - 11px)
+  );
+  z-index: 1;
+  transition: background-color 0.2s ease;
+}
+
+.btn-chamfer-outline:hover {
+  background-color: #D4FF3F;
+  color: #D4FF3F;
+}
+
+.btn-chamfer-outline:hover::before {
+  background-color: #111210;
+}
+
+.btn-chamfer-outline > * {
+  position: relative;
+  z-index: 2;
+}
+
+.btn-chamfer-outline:focus-visible {
+  outline: 2px solid #D4FF3F;
+  outline-offset: 3px;
+}
+
+/* Hero Typography Scale (Controlled strictly by --hero-type-scale) */
+.hero-title-text {
+  font-size: calc(clamp(3.75rem, 2.5rem + 5vw, 8rem) * var(--hero-type-scale));
+  line-height: 0.88;
+}
+
+.hero-beoffscript-text {
+  font-size: calc(clamp(2.25rem, 1.5rem + 3.75vw, 6rem) * var(--hero-type-scale));
+  line-height: 1;
+}
+
+.hero-typing-text {
+  font-size: calc(clamp(0.875rem, 0.8rem + 0.3vw, 1.125rem) * var(--hero-type-scale));
+}
+
+.hero-para-text {
+  font-size: calc(clamp(1rem, 0.95rem + 0.2vw, 1.125rem) * var(--hero-type-scale));
 }
 
 @theme {
@@ -939,5 +1037,54 @@ html[data-perf="lite"] .hero-title-char {
   animation: none !important;
   transform: none !important;
 }
+
+/* =========================================================================
+   CURTAIN TRANSITION (CSS-only hardware-accelerated for instant performance)
+   ========================================================================= */
+@keyframes curtainCoverAnim {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0%);
+  }
+}
+
+@keyframes curtainRevealAnim {
+  from {
+    transform: translateY(0%);
+  }
+  to {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes wordmarkWipeAnim {
+  from {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+  }
+  to {
+    clip-path: inset(0 0% 0 0);
+    opacity: 1;
+  }
+}
+
+.curtain-covering {
+  animation: curtainCoverAnim 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.curtain-holding {
+  transform: translateY(0%);
+}
+
+.curtain-revealing {
+  animation: curtainRevealAnim 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.curtain-wordmark {
+  animation: wordmarkWipeAnim 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 
 
