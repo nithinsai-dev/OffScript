@@ -331,9 +331,14 @@ export class SplashEngine {
     const radius = minR + Math.random() * (maxR - minR)
     const seed = Math.floor(Math.random() * 1000000)
 
+    // Clamp center so tendrils and droplets never get cut at canvas edges
+    const inset = Math.max(32, radius * 0.75)
+    const clampedX = Math.max(inset, Math.min(this.width - inset, x))
+    const clampedY = Math.max(inset, Math.min(this.height - inset, y))
+
     const shape = generateSplashShape(
-      x,
-      y,
+      clampedX,
+      clampedY,
       radius,
       seed,
       false,
@@ -344,8 +349,8 @@ export class SplashEngine {
     const instanceId = this.nextClickId++
     this.clickSplashes.push({
       id: instanceId,
-      cx: x,
-      cy: y,
+      cx: clampedX,
+      cy: clampedY,
       radius,
       shape,
       startTime: now,

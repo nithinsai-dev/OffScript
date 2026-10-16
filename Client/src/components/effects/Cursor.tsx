@@ -230,18 +230,18 @@ export function Cursor() {
 
   return (
     <>
-      {/* 1. DPR-capped 30fps Idle-stopped Canvas Trail */}
+      {/* 1. DPR-capped 30fps Idle-stopped Canvas Trail (Option A: Layered above registration modal z-[99999]) */}
       <canvas
         ref={canvasRef}
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-[99998]"
+        className="pointer-events-none fixed inset-0 z-[100001]"
       />
 
       {/* 2. Core Point (Bone diamond: mix-blend-mode difference only on small diamond, normal on large circle) */}
       <div
         ref={cursorRef}
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 z-[99999]"
+        className="pointer-events-none fixed top-0 left-0 z-[100002]"
       >
         <motion.div
           animate={{
@@ -264,7 +264,7 @@ export function Cursor() {
       <div
         ref={labelRef}
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 z-[99999]"
+        className="pointer-events-none fixed top-0 left-0 z-[100002]"
       >
         <AnimatePresence>
           {cursorLabel && (

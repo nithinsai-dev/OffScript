@@ -17,41 +17,55 @@ export interface SplashComposition {
 export function createHeroComposition(width = 560, height = 560): SplashComposition {
   const seeds = splashConfig.seeds
 
+  // Fit scale and centering offset to ensure >= 8% inset on every side (no cut tendrils or droplets)
+  const fitScale = 0.64
+  const centerX = width * 0.5 + width * (15 / 560)
+  const centerY = height * 0.5 + height * (15 / 560)
+
+  const scalePoint = (origX: number, origY: number) => ({
+    x: centerX + (origX - width * 0.5) * fitScale,
+    y: centerY + (origY - height * 0.5) * fitScale,
+  })
+
   // 1. Big Splash: ~60% stage width, slightly off-center (cx ~ 0.48, cy ~ 0.48)
-  const bigRadius = width * 0.28
+  const pBig = scalePoint(width * 0.48, height * 0.48)
+  const bigRadius = width * 0.28 * fitScale
   const big = generateSplashShape(
-    width * 0.48,
-    height * 0.48,
+    pBig.x,
+    pBig.y,
     bigRadius,
     seeds.big,
     true // isBig = true (diamond cutout, drips, larger crown)
   )
 
   // 2. Medium Splash 1: bottom-left quadrant
-  const med1Radius = width * 0.135
+  const pM1 = scalePoint(width * 0.20, height * 0.76)
+  const med1Radius = width * 0.135 * fitScale
   const medium1 = generateSplashShape(
-    width * 0.20,
-    height * 0.76,
+    pM1.x,
+    pM1.y,
     med1Radius,
     seeds.medium1,
     false
   )
 
   // 3. Medium Splash 2: top-right quadrant
-  const med2Radius = width * 0.125
+  const pM2 = scalePoint(width * 0.80, height * 0.24)
+  const med2Radius = width * 0.125 * fitScale
   const medium2 = generateSplashShape(
-    width * 0.80,
-    height * 0.24,
+    pM2.x,
+    pM2.y,
     med2Radius,
     seeds.medium2,
     false
   )
 
   // 4. Small Splash: bottom-right quadrant
-  const smallRadius = width * 0.085
+  const pSm = scalePoint(width * 0.82, height * 0.74)
+  const smallRadius = width * 0.085 * fitScale
   const small = generateSplashShape(
-    width * 0.82,
-    height * 0.74,
+    pSm.x,
+    pSm.y,
     smallRadius,
     seeds.small,
     false

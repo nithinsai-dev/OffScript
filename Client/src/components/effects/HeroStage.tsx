@@ -5,6 +5,7 @@ import { HERO_STATIC_SPLASH_SVG } from '@/lib/splash/staticSvgPaths'
 
 interface HeroStageProps {
   className?: string
+  mode?: 'desktop' | 'mobile' | 'both'
 }
 
 interface SplashEngineInstance {
@@ -14,7 +15,7 @@ interface SplashEngineInstance {
   destroy: () => void
 }
 
-export function HeroStage({ className = '' }: HeroStageProps) {
+export function HeroStage({ className = '', mode = 'both' }: HeroStageProps) {
   const { setCursor, resetCursor } = useCursor()
 
   const desktopContainerRef = useRef<HTMLDivElement | null>(null)
@@ -41,6 +42,7 @@ export function HeroStage({ className = '' }: HeroStageProps) {
   // 1. Desktop Canvas Engine Initialization
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (mode === 'mobile') return
     const isLite = document.documentElement.getAttribute('data-perf') === 'lite'
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const isDesktop = window.innerWidth >= 1024
@@ -97,11 +99,12 @@ export function HeroStage({ className = '' }: HeroStageProps) {
         desktopEngineRef.current = null
       }
     }
-  }, [handleFirstInteraction, handleStageShake])
+  }, [handleFirstInteraction, handleStageShake, mode])
 
   // 2. Mobile IntersectionObserver for one-time CSS impact animation
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (mode === 'desktop') return
     const el = mobileContainerRef.current
     if (!el) return
 
@@ -118,10 +121,10 @@ export function HeroStage({ className = '' }: HeroStageProps) {
 
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [mode])
 
   // 3. Desktop Click Handler
-  const handleDesktopPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleDesktopPointerDown = (e: React.PointerEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
     handleFirstInteraction()
     if (desktopEngineRef.current) {
       desktopEngineRef.current.triggerClickSplash(e.clientX, e.clientY)
@@ -168,57 +171,81 @@ export function HeroStage({ className = '' }: HeroStageProps) {
     <>
       {/* =========================================================================
           DESKTOP HERO STAGE (Visible on lg: screens >= 1024px)
-          - Positioned on the right of the hero
-          - Fixed 1:1 aspect ratio, max 560px
-          - Zero layout shift
+          - Occupies its own column in the hero 2-column grid
+          - Centered vertically
+          - Square drawing area: width = min(100%, 560px, calc(100vh - 80px - 2rem))
+          - Caption row reserved directly below drawing area
           - Custom cursor "SPLASH"
           ========================================================================= */}
-      <div
-        id="hero-stage-slot"
-        data-hero-stage="true"
-        data-testid="hero-stage"
-        ref={desktopContainerRef}
-        aria-hidden="true"
-        className={`hidden lg:block absolute right-0 lg:right-2 xl:right-4 lg:top-28 xl:top-20 w-[350px] lg:w-[370px] xl:w-[480px] 2xl:w-[520px] max-w-[560px] aspect-square select-none z-10 pointer-events-auto cursor-pointer ${className}`}
-        style={{
-          transform: `translate3d(${stageShake.x}px, ${stageShake.y}px, 0)`,
-          transition: stageShake.x === 0 ? 'transform 0.15s ease-out' : 'none',
-        }}
-        onMouseEnter={() => setCursor('default', 'SPLASH')}
-        onMouseLeave={resetCursor}
-        onPointerDown={handleDesktopPointerDown}
-        onMouseDown={handleDesktopPointerDown}
-        onClick={handleDesktopPointerDown}
-      >
-        <div className="relative w-full h-full">
-          {/* Main 2D Canvas */}
-          <canvas
-            ref={desktopCanvasRef}
-            className="w-full h-full block"
-          />
-
-          {/* Tiny Mono Hint: Fades out after first click */}
+      {mode !== 'mobile' && (
+        <div
+          data-hero-stage-desktop="true"
+          className={`hidden lg:flex flex-col items-center justify-center w-full relative ${className}`}
+          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+        >
+          {/* Square drawing area, centered in right column */}
           <div
-            data-splash-hint="true"
-            className={`absolute bottom-3 right-4 font-mono text-[10px] text-bone/50 uppercase tracking-widest pointer-events-none transition-opacity duration-700 ${
-              hasInteracted ? 'opacity-0' : 'opacity-100'
-            }`}
+            id="hero-stage-slot"
+            data-hero-stage="true"
+            data-testid="hero-stage"
+            ref={desktopContainerRef}
+            aria-hidden="true"
+            className="relative aspect-square w-full max-w-[560px] cursor-pointer pointer-events-auto select-none overflow-hidden"
+            style={{
+              width: 'min(100%, 560px, calc(100vh - 80px - 2rem))',
+              height: 'min(100%, 560px, calc(100vh - 80px - 2rem))',
+              transform: `translate3d(${stageShake.x}px, ${stageShake.y}px, 0)`,
+              transition: stageShake.x === 0 ? 'transform 0.15s ease-out' : 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }}
+            onMouseEnter={() => setCursor('default', 'SPLASH')}
+            onMouseLeave={resetCursor}
+            onPointerDown={handleDesktopPointerDown}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              handleDesktopPointerDown(e)
+            }}
+            onClick={handleDesktopPointerDown}
           >
-            CLICK TO SPLASH
+            <div className="relative w-full h-full">
+              {/* Main 2D Canvas */}
+              <canvas
+                id="hero-stage-canvas"
+                ref={desktopCanvasRef}
+                className="w-full h-full block"
+              />
+
+              {/* Dev-only Replay Button (stripped in production) */}
+              {import.meta.env.DEV && (
+                <button
+                  type="button"
+                  onClick={handleReplay}
+                  className="absolute top-3 right-4 px-2.5 py-1 bg-ink/90 border border-volt/60 text-volt font-mono text-[10px] font-bold uppercase tracking-wider hover:bg-volt hover:text-ink transition-colors z-20 pointer-events-auto shadow-md"
+                >
+                  Replay splash
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Dev-only Replay Button (stripped in production) */}
-          {import.meta.env.DEV && (
-            <button
-              type="button"
-              onClick={handleReplay}
-              className="absolute top-3 right-4 px-2.5 py-1 bg-ink/90 border border-volt/60 text-volt font-mono text-[10px] font-bold uppercase tracking-wider hover:bg-volt hover:text-ink transition-colors z-20 pointer-events-auto shadow-md"
+          {/* Reserved Stage Caption Row directly below the drawing area */}
+          <div
+            id="stage-caption-row"
+            className="w-full max-w-[560px] flex justify-end items-center pt-2 px-1 min-h-[24px] pointer-events-none"
+            style={{ width: 'min(100%, 560px, calc(100vh - 80px - 2rem))' }}
+          >
+            <div
+              data-splash-hint="true"
+              className={`font-mono text-[10px] text-bone/50 uppercase tracking-widest pointer-events-none transition-opacity duration-700 ${
+                hasInteracted ? 'opacity-0' : 'opacity-100'
+              }`}
             >
-              Replay splash
-            </button>
-          )}
+              CLICK TO SPLASH
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* =========================================================================
           MOBILE / LITE HERO STAGE (Visible on screens < lg)
@@ -228,30 +255,32 @@ export function HeroStage({ className = '' }: HeroStageProps) {
           - Static SVG with one-time CSS impact animation on scroll
           - Lazy loads canvas engine on first tap
           ========================================================================= */}
-      <div
-        data-hero-stage-mobile="true"
-        ref={mobileContainerRef}
-        aria-hidden="true"
-        className="block lg:hidden w-full max-w-sm sm:max-w-md mx-auto aspect-[16/10] max-h-[240px] my-6 select-none relative overflow-hidden"
-        style={{ touchAction: 'manipulation' }}
-        onPointerDown={handleMobilePointerDown}
-      >
-        {/* Static SVG composition with one-time scale impact */}
+      {mode !== 'desktop' && (
         <div
-          className={`w-full h-full flex items-center justify-center transition-transform duration-500 ease-out ${
-            mobileScrolledIn ? 'scale-100' : 'scale-[0.6] opacity-90'
-          }`}
-          dangerouslySetInnerHTML={{ __html: HERO_STATIC_SPLASH_SVG }}
-        />
+          data-hero-stage-mobile="true"
+          ref={mobileContainerRef}
+          aria-hidden="true"
+          className="block lg:hidden w-full max-w-sm sm:max-w-md mx-auto aspect-[16/10] max-h-[240px] my-6 select-none relative overflow-hidden"
+          style={{ touchAction: 'manipulation', userSelect: 'none', WebkitUserSelect: 'none' }}
+          onPointerDown={handleMobilePointerDown}
+        >
+          {/* Static SVG composition with one-time scale impact */}
+          <div
+            className={`w-full h-full flex items-center justify-center transition-transform duration-500 ease-out ${
+              mobileScrolledIn ? 'scale-100' : 'scale-[0.6] opacity-90'
+            }`}
+            dangerouslySetInnerHTML={{ __html: HERO_STATIC_SPLASH_SVG }}
+          />
 
-        {/* Dynamic canvas overlay (activated only after first tap) */}
-        <canvas
-          ref={mobileCanvasRef}
-          className={`absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-300 ${
-            mobileEngineLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-      </div>
+          {/* Dynamic canvas overlay (activated only after first tap) */}
+          <canvas
+            ref={mobileCanvasRef}
+            className={`absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-300 ${
+              mobileEngineLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        </div>
+      )}
     </>
   )
 }

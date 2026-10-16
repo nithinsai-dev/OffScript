@@ -248,71 +248,81 @@ export function LandingPage() {
         data-in-hero="true"
         className="relative min-h-[90vh] pt-32 pb-20 md:pt-40 md:pb-28 flex flex-col justify-between border-b-2 border-bone/20 overflow-hidden"
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10 space-y-12">
-          {/* Main Hero Header */}
-          <div className="space-y-6 max-w-4xl relative">
-            {/* Wordmark Headline (1.3s character masked rise starting on first painted frame) */}
-            <div className="space-y-2">
-              <h1 className="hero-title-text font-display font-black tracking-tight text-bone uppercase">
-                <SplitText text="OFFSCRIPT" tag="span" isHeroTitle />
-              </h1>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12 items-center relative">
+            {/* LEFT COLUMN: Content (title, tagline, supporting, buttons, stats strip) */}
+            <div className="lg:col-span-7 flex flex-col justify-center space-y-6 sm:space-y-8 z-10 min-w-0">
+              <div className="space-y-6 relative">
+                {/* Wordmark Headline (1.3s character masked rise starting on first painted frame) */}
+                <div className="space-y-2">
+                  <h1 className="hero-title-text font-display font-black tracking-tight text-bone uppercase">
+                    <SplitText text="OFFSCRIPT" tag="span" isHeroTitle />
+                  </h1>
 
-              {/* Typographic Outlined #beoffscript with Typing Loop */}
-              <div id="hero-tagline">
-                <HeroTagline />
+                  {/* Typographic Outlined #beoffscript with Typing Loop */}
+                  <div id="hero-tagline">
+                    <HeroTagline />
+                  </div>
+                </div>
+
+                {/* Friendly One-Line Statement */}
+                <p id="hero-supporting" className="hero-para-text font-sans text-bone/75 max-w-xl leading-relaxed">
+                  Your campus. Your events. Zero boring. Discover and grab your passes for hackathons, jams, and festivals in seconds.
+                </p>
+
+                {/* Action Buttons: Explore Events navigates to /events with prefetch */}
+                <div id="hero-buttons" className="w-fit flex flex-wrap items-center gap-4 pt-2">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    magnetic
+                    onClick={() => navigate({ to: '/events' })}
+                    onMouseEnter={handlePrefetchEvents}
+                    onFocus={handlePrefetchEvents}
+                    cursorLabel="Explore"
+                  >
+                    Explore Events
+                  </Button>
+                  <button
+                    type="button"
+                    className="btn-chamfer-outline text-sm px-6 py-3.5 font-bold tracking-wider"
+                    onClick={() => {
+                      scrollTo('#lineup', {
+                        offset: -96,
+                        duration: 0.9,
+                        easing: easeOutExpo,
+                      })
+                    }}
+                    onMouseEnter={() => setCursor('button', 'Lineup')}
+                    onMouseLeave={resetCursor}
+                  >
+                    <span>See Lineup</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Mobile Hero Stage (in-flow between buttons and stats on mobile only) */}
+              <HeroStage mode="mobile" />
+
+              {/* Hero Ticket Strip with Data Barcode */}
+              <HeroTicketStrip />
             </div>
 
-            {/* Friendly One-Line Statement */}
-            <p id="hero-supporting" className="hero-para-text font-sans text-bone/75 max-w-xl leading-relaxed">
-              Your campus. Your events. Zero boring. Discover and grab your passes for hackathons, jams, and festivals in seconds.
-            </p>
-
-            {/* Action Buttons: Explore Events navigates to /events with prefetch */}
-            <div id="hero-buttons" className="w-fit flex flex-wrap items-center gap-4 pt-2">
-              <Button
-                variant="primary"
-                size="lg"
-                magnetic
-                onClick={() => navigate({ to: '/events' })}
-                onMouseEnter={handlePrefetchEvents}
-                onFocus={handlePrefetchEvents}
-                cursorLabel="Explore"
+            {/* RIGHT COLUMN: Splash stage occupying its own column and centered vertically */}
+            <div className="hidden lg:flex lg:col-span-5 flex-col items-center justify-center relative w-full h-full min-w-0 pointer-events-none">
+              {/* Floating Sticker Badge (Part 2: left edge aligns with left edge of stage column) */}
+              <div
+                id="hero-sticker"
+                className="self-start mb-2 z-20 flex items-center gap-2 px-3.5 py-1.5 bg-volt text-ink font-mono text-xs font-black uppercase tracking-wider rotate-6 border-2 border-ink shadow-2xl select-none pointer-events-none"
               >
-                Explore Events
-              </Button>
-              <button
-                type="button"
-                className="btn-chamfer-outline text-sm px-6 py-3.5 font-bold tracking-wider"
-                onClick={() => {
-                  scrollTo('#lineup', {
-                    offset: -96,
-                    duration: 0.9,
-                    easing: easeOutExpo,
-                  })
-                }}
-                onMouseEnter={() => setCursor('button', 'Lineup')}
-                onMouseLeave={resetCursor}
-              >
-                <span>See Lineup</span>
-              </button>
-            </div>
+                <span className="w-2 h-2 bg-ink rotate-45" />
+                <span>2026 EDITION</span>
+              </div>
 
-            {/* Floating Sticker Badge (Part 8) */}
-            <div
-              id="hero-sticker"
-              className="absolute right-0 top-4 hidden lg:flex items-center gap-2 px-3.5 py-1.5 bg-volt text-ink font-mono text-xs font-black uppercase tracking-wider rotate-6 border-2 border-ink shadow-2xl select-none pointer-events-none"
-            >
-              <span className="w-2 h-2 bg-ink rotate-45" />
-              <span>2026 EDITION</span>
+              {/* Desktop Hero Stage */}
+              <HeroStage mode="desktop" />
             </div>
           </div>
-
-          {/* Hero Stage (Mobile in-flow between buttons and stats, Desktop on right of hero) */}
-          <HeroStage />
-
-          {/* Hero Ticket Strip with Data Barcode */}
-          <HeroTicketStrip />
         </div>
       </section>
 
