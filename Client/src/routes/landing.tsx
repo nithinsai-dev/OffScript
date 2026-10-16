@@ -269,7 +269,7 @@ export function LandingPage() {
             </p>
 
             {/* Action Buttons: Explore Events navigates to /events with prefetch */}
-            <div id="hero-buttons" className="flex flex-wrap items-center gap-4 pt-2">
+            <div id="hero-buttons" className="w-fit flex flex-wrap items-center gap-4 pt-2">
               <Button
                 variant="primary"
                 size="lg"
@@ -308,11 +308,11 @@ export function LandingPage() {
             </div>
           </div>
 
+          {/* Hero Stage (Mobile in-flow between buttons and stats, Desktop on right of hero) */}
+          <HeroStage />
+
           {/* Hero Ticket Strip with Data Barcode */}
           <HeroTicketStrip />
-
-          {/* Invisible Reserved 3D Slot */}
-          <HeroStage />
         </div>
       </section>
 

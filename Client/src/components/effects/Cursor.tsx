@@ -184,6 +184,12 @@ export function Cursor() {
     }
 
     const handleClick = (e: MouseEvent) => {
+      // Disable global click-burst while inside the hero stage so the two effects do not stack
+      const target = e.target as HTMLElement | null
+      if (target?.closest?.('#hero-stage-slot, [data-hero-stage]')) {
+        return
+      }
+
       // Spawn 8 Volt shards flying radially on click
       const newShards = createCursorShards(e.clientX, e.clientY, 8)
       shardsRef.current.push(...newShards)
